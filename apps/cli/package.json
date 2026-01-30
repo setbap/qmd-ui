@@ -1,0 +1,30 @@
+{
+  "name": "@qmd/cli",
+  "version": "1.0.0",
+  "description": "QMD CLI application - command-line interface for Quick Markdown Search",
+  "type": "module",
+  "main": "./src/cli.ts",
+  "bin": {
+    "qmd-cli": "./bin/qmd-cli"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "lint": "echo 'No lint configured'",
+    "start": "bun run src/cli.ts"
+  },
+  "dependencies": {
+    "@qmd/core": "workspace:*",
+    "@qmd/formatter": "workspace:*",
+    "@qmd/mcp": "workspace:*",
+    "node-llama-cpp": "^3.14.5",
+    "sqlite-vec": "^0.1.7-alpha.2",
+    "yaml": "^2.8.2"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,2 @@
+#!/usr/bin/env bun
+exec bun run "$(dirname "$0")/../src/main.tsx" "$@"

@@ -1,0 +1,26 @@
+{
+  "name": "@qmd/web",
+  "version": "1.0.0",
+  "description": "QMD Web - Web interface for Quick Markdown Search (shadcn/ui)",
+  "type": "module",
+  "main": "./src/web.ts",
+  "bin": {
+    "qmd-web": "./bin/qmd-web"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
+    "lint": "echo 'No lint configured'",
+    "start": "bun run src/web.ts"
+  },
+  "dependencies": {
+    "@qmd/core": "workspace:*",
+    "@qmd/formatter": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

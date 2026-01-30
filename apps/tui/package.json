@@ -1,0 +1,30 @@
+{
+  "name": "@qmd/tui",
+  "version": "1.0.0",
+  "description": "QMD TUI - Terminal User Interface for Quick Markdown Search (OpenTUI + SolidJS)",
+  "type": "module",
+  "main": "./src/main.tsx",
+  "bin": {
+    "qmd-tui": "./bin/qmd-tui"
+  },
+  "scripts": {
+    "dev": "bun run --watch src/main.tsx"
+  },
+  "dependencies": {
+    "@opentui/core": "^0.1.75",
+    "@opentui/solid": "^0.1.75",
+    "@qmd/core": "workspace:*",
+    "@qmd/formatter": "workspace:*",
+    "@babel/core": "^7.28.5",
+    "@babel/preset-typescript": "^7.28.5",
+    "babel-preset-solid": "1.9.9",
+    "solid-js": "1.9.9"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
