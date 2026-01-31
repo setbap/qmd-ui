@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 import { Database } from "bun:sqlite";
-import { Glob } from "bun";
 import { parseArgs } from "util";
 import {
   getPwd,
@@ -1658,7 +1657,7 @@ async function indexFiles(
   console.log(`Collection: ${resolvedPwd} (${globPattern})`);
 
   progress.indeterminate();
-  const glob = new Glob(globPattern);
+  const glob = new Bun.Glob(globPattern);
   const files: string[] = [];
   for await (const file of glob.scan({
     cwd: resolvedPwd,
