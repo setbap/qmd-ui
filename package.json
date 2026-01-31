@@ -12,13 +12,14 @@
     "dev:cli": "bun run apps/cli/src/cli.ts",
     "dev:mcp": "bun run apps/mcp/src/mcp.ts",
     "dev:tui": "bun run --filter '@qmd/tui' dev",
-    "dev:web": "bun run apps/web/src/web.ts",
+    "dev:web": "bun run --filter '@qmd/web' dev",
     "typecheck": "bun run --filter '*' typecheck",
     "test": "bun run --filter '*' test",
     "lint": "bun run --filter '*' lint"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.1",
+    "nitro": "^3.0.1-alpha.2",
     "node-llama-cpp": "^3.14.5",
     "sqlite-vec": "^0.1.7-alpha.2",
     "yaml": "^2.8.2",
