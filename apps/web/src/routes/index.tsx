@@ -133,7 +133,6 @@ function HomeComponent() {
             <Kbd>⌘K</Kbd>
           </Button>
         }
-        searchBar={<></>}
         sideBar={
           <CollectionPanel
             collections={collections.collections}
@@ -181,7 +180,6 @@ function HomeComponent() {
             />
           </div>
 
-          <div className="h-20 py-1"></div>
           <SearchBar
             value={search.query}
             onChange={search.setQuery}

@@ -254,7 +254,7 @@ export function getDefaultDbPath(indexName: string = "index"): string {
   }
 
   // In non-production mode (tests), require explicit path
-  if (!_productionMode) {
+  if (!_productionMode && Bun.env.NODE_ENV === "test") {
     throw new Error(
       "Database path not set. Tests must set INDEX_PATH env var or use createStore() with explicit path. " +
         "This prevents tests from accidentally writing to the global index.",
@@ -1886,9 +1886,7 @@ export function getCollectionByName(
  * List all collections with document counts from database.
  * Merges YAML config with database statistics.
  */
-export function listCollections(
-  db: Database,
-): {
+export function listCollections(db: Database): {
   name: string;
   pwd: string;
   glob_pattern: string;

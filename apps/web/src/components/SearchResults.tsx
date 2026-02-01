@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { RiFileTextLine } from '@remixicon/react'
 import { cn } from '@/lib/utils'
+import { Badge } from './ui/badge'
 
 export interface SearchResult {
   docid: string
@@ -45,22 +46,25 @@ export function SearchResults({
   return (
     <div className={cn('flex h-full flex-col')}>
       {/* Header */}
-      <div className="flex items-center justify-between border-b px-4 py-3">
-        <h2 className="text-sm font-medium ">
-          Search Results
-          {query && (
-            <span className="ml-2 text-xs ">for &quot;{query}&quot;</span>
-          )}
-        </h2>
-        <span className="text-xs ">{results.length} results</span>
-      </div>
+
+      {query && (
+        <div className="flex items-center justify-between z-0 -my-1 px-2">
+          <h2 className="text-sm font-medium ">
+            Search Results
+            {query && (
+              <span className="ml-2 text-xs ">for &quot;{query}&quot;</span>
+            )}
+          </h2>
+          <span className="text-xs ">{results.length} results</span>
+        </div>
+      )}
 
       {/* Results List */}
       <ScrollArea className="flex-1">
         <div className="space-y-2 p-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="h-6 w-6 animate-spin rounded-full border-1" />
+              <div className="h-6 w-6 animate-spin rounded-full border" />
             </div>
           ) : results.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -75,10 +79,12 @@ export function SearchResults({
             results.map((result, index) => (
               <Card
                 key={result.docid}
+                tabIndex={0}
+                role="button"
                 onClick={() => onSelectResult?.(result)}
                 className={cn(
                   'cursor-pointer',
-                  'transition-colors hover:border-amber-800 hover:bg-[#231f1d]',
+                  'transition-colors border-transparent border hover:border-amber-800',
                   onSelectResult && 'cursor-pointer',
                 )}
               >
@@ -100,8 +106,9 @@ export function SearchResults({
                 <CardContent className="space-y-2 pt-0">
                   {/* Path and DocID */}
                   <div className="flex items-center gap-2 text-xs ">
-                    <span className="rounded bg-amber-950 px-1.5 py-0.5 font-mono ">
-                      #{result.docid}
+                    <span>
+                      doc id:
+                      <Badge variant={'secondary'}>#{result.docid}</Badge>
                     </span>
                     <span className="truncate">{result.displayPath}</span>
                   </div>

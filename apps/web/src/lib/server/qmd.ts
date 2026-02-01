@@ -61,7 +61,7 @@ let storeInstance: Awaited<ReturnType<typeof createStore>> | null = null
 
 async function getStore() {
   if (!storeInstance) {
-    storeInstance = await createStore()
+    storeInstance = createStore()
   }
   return storeInstance
 }
@@ -74,18 +74,25 @@ export const getCollections = createServerFn().handler(async () => {
   return listCollections()
 })
 
-export const getCollectionFiles = createServerFn().handler(async (ctx) => {
-  // Access request from context
-  const request = (ctx as any).request
-  if (!request) throw new Error('Request not available')
+export const getCollectionFiles = createServerFn()
+  .inputValidator((data: { name: string }) => data)
+  .handler(async ({ data }) => {
+    const { name } = data
+    if (!name) throw new Error('Collection name required')
 
-  const url = new URL(request.url)
-  const name = url.searchParams.get('name')
-  if (!name) throw new Error('Collection name required')
+    try {
+      console.clear()
+      console.log('gooo')
+      const store = await getStore()
+      const d = getActiveDocumentPaths(store.db, name)
+      console.log({ d })
 
-  const store = await getStore()
-  return getActiveDocumentPaths(store.db, name)
-})
+      return d
+    } catch (error) {
+      console.log(error)
+      return []
+    }
+  })
 
 export const createCollection = createServerFn().handler(async (ctx) => {
   const data = ctx.data as unknown as {

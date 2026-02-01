@@ -71,7 +71,7 @@ export function SearchBar({
       )}
     >
       <div className="px-4 py-4">
-        <InputGroup className="h-auto min-h-20 rounded-xl">
+        <InputGroup className="h-auto bg-background shadow-2xl min-h-18 rounded-xl">
           <InputGroupInput
             value={value}
             onChange={(e) => onChange(e.target.value)}
@@ -122,12 +122,7 @@ export function SearchBar({
               </div>
             </div>
 
-            <Button
-              onClick={onSubmit}
-              disabled={disabled || !value.trim()}
-              variant={'default'}
-              className={'bg-red-400'}
-            >
+            <Button onClick={onSubmit} disabled={disabled} variant={'default'}>
               <RiSearchLine className="h-4 w-4" />
             </Button>
           </InputGroupAddon>

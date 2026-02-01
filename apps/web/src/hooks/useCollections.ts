@@ -47,17 +47,20 @@ export function useCollections() {
 
   // Collection files - direct async function for components
   const fetchCollectionFiles = useCallback(
-    async (collectionName: string): Promise<Array<{ path: string; title?: string }>> => {
+    async (
+      collectionName: string,
+    ): Promise<Array<{ path: string; title?: string }>> => {
+      console.clear()
+      console.log(collectionName)
       const result = await getCollectionFiles({
-        query: { name: collectionName },
-      } as any)
-      // Map the string paths to FileInfo objects
+        data: { name: collectionName },
+      })
       return result.map((path: string) => ({
         path,
         title: path.split('/').pop(),
       }))
     },
-    []
+    [],
   )
 
   // Collection files query (for expanded collections - hook version)

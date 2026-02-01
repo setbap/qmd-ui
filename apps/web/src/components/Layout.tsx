@@ -16,21 +16,15 @@ import {
 } from '@/components/ui/sidebar'
 interface LayoutProps {
   children: ReactNode
-  searchBar: ReactNode
   commandPalette: ReactNode
   sideBar: ReactNode
 }
 
-export function Layout({
-  children,
-  searchBar,
-  commandPalette,
-  sideBar,
-}: LayoutProps) {
+export function Layout({ children, commandPalette, sideBar }: LayoutProps) {
   return (
     <SidebarProvider>
       <SidebarInset>
-        <header className="flex h-16 shrink-0  items-center gap-2 border-b px-4">
+        <header className="sticky top-0 z-10 bg-background flex h-13 shrink-0  items-center gap-2 border-b px-4">
           <div className="flex-1 flex items-center justify-center">
             {commandPalette}
           </div>
@@ -41,7 +35,6 @@ export function Layout({
           <div className="flex flex-1 overflow-hidden px-4 pb-24">
             {children}
           </div>
-          {searchBar}
         </div>
       </SidebarInset>
       {sideBar}
