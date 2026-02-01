@@ -83,13 +83,13 @@ export function SettingsDialog({
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-900/30">
-              <RiSettings3Line className="h-5 w-5 text-amber-300" />
+              <RiSettings3Line className="h-5 w-5 " />
             </div>
             <div>
               <DialogTitle className="text-lg font-medium text-amber-50">
                 Settings
               </DialogTitle>
-              <DialogDescription className="text-sm text-amber-600">
+              <DialogDescription className="text-sm ">
                 Configure your QMD preferences
               </DialogDescription>
             </div>
@@ -99,8 +99,8 @@ export function SettingsDialog({
         <div className="space-y-6 py-4">
           {/* Global Context */}
           <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-sm font-medium text-amber-100">
-              <RiGlobalLine className="h-4 w-4 text-amber-600" />
+            <Label className="flex items-center gap-2 text-sm font-medium ">
+              <RiGlobalLine className="h-4 w-4 " />
               Global Context
             </Label>
             <Textarea
@@ -114,12 +114,11 @@ export function SettingsDialog({
               placeholder="Context applied to all collections and searches..."
               rows={4}
               className={cn(
-                'resize-none rounded-lg text-amber-100',
-                'placeholder:text-amber-700',
+                'resize-none rounded-lg ',
                 'focus-visible:border-amber-500 focus-visible:ring-amber-500/20',
               )}
             />
-            <p className="text-xs text-amber-600">
+            <p className="text-xs ">
               This context will be included with every search query across all
               collections
             </p>
@@ -127,8 +126,8 @@ export function SettingsDialog({
 
           {/* Results Per Page */}
           <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-sm font-medium text-amber-100">
-              <RiListOrdered className="h-4 w-4 text-amber-600" />
+            <Label className="flex items-center gap-2 text-sm font-medium ">
+              <RiListOrdered className="h-4 w-4 " />
               Results Per Page
             </Label>
             <Input
@@ -143,19 +142,19 @@ export function SettingsDialog({
                 }))
               }
               className={cn(
-                'h-10 w-32 rounded-lg text-amber-100',
+                'h-10 w-32 rounded-lg ',
                 'focus-visible:border-amber-500 focus-visible:ring-amber-500/20',
               )}
             />
-            <p className="text-xs text-amber-600">
+            <p className="text-xs ">
               Number of results to display per page (1-100)
             </p>
           </div>
 
           {/* Output Format */}
           <div className="space-y-2">
-            <Label className="flex items-center gap-2 text-sm font-medium text-amber-100">
-              <RiTerminalLine className="h-4 w-4 text-amber-600" />
+            <Label className="flex items-center gap-2 text-sm font-medium ">
+              <RiTerminalLine className="h-4 w-4 " />
               Default Output Format
             </Label>
             <Select
@@ -169,7 +168,7 @@ export function SettingsDialog({
             >
               <SelectTrigger
                 className={cn(
-                  'h-10 rounded-lg text-amber-100',
+                  'h-10 rounded-lg ',
                   'focus:border-amber-500 focus:ring-amber-500/20',
                 )}
               >
@@ -180,21 +179,17 @@ export function SettingsDialog({
                   <SelectItem
                     key={option.value}
                     value={option.value}
-                    className="text-amber-100 focus:bg-amber-900/30 focus:text-amber-50"
+                    className=" focus:bg-amber-900/30 focus:text-amber-50"
                   >
                     <div className="flex flex-col">
                       <span className="font-medium">{option.label}</span>
-                      <span className="text-xs text-amber-600">
-                        {option.description}
-                      </span>
+                      <span className="text-xs ">{option.description}</span>
                     </div>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-amber-600">
-              Default format for search result output
-            </p>
+            <p className="text-xs ">Default format for search result output</p>
           </div>
         </div>
 
@@ -203,15 +198,11 @@ export function SettingsDialog({
             type="button"
             variant="outline"
             onClick={() => onOpenChange(false)}
-            className="h-9 rounded-lg bg-transparent text-amber-300 hover:bg-amber-900/30 hover:text-amber-100"
+            className="h-9 rounded-lg"
           >
             Cancel
           </Button>
-          <Button
-            type="button"
-            onClick={handleSave}
-            className="h-9 rounded-lg bg-amber-500 px-6 text-white hover:bg-amber-600"
-          >
+          <Button type="button" onClick={handleSave} className="h-9 rounded-lg">
             Save Changes
           </Button>
         </DialogFooter>

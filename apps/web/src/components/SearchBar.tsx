@@ -1,8 +1,13 @@
 'use client'
 
 import * as React from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+  InputGroupText,
+} from '@/components/ui/input-group'
 import {
   Select,
   SelectContent,
@@ -12,6 +17,8 @@ import {
 } from '@/components/ui/select'
 import { RiSearchLine, RiDatabase2Line } from '@remixicon/react'
 import { cn } from '@/lib/utils'
+import { Badge } from './ui/badge'
+import { Button } from './ui/button'
 
 type SearchMode = 'search' | 'vsearch' | 'query'
 
@@ -22,7 +29,6 @@ interface SearchBarProps {
   mode: SearchMode
   onModeChange: (mode: SearchMode) => void
   selectedCollection: string | null
-  onFocusCollection?: () => void
   placeholder?: string
   disabled?: boolean
 }
@@ -58,83 +64,74 @@ export function SearchBar({
   return (
     <div
       className={cn(
-        'fixed bottom-0 left-0 right-0 z-50',
-        'border-t',
-        'bg-[#0a0908]',
+        'fixed bottom-0 z-50',
+        'left-1/2',
+        '-translate-x-1/2',
+        'min-w-4xl',
       )}
     >
-      <div className="flex items-end gap-2 px-4 py-4">
-        {/* Main Search Input Container */}
-        <div className="relative flex-1">
-          <Input
+      <div className="px-4 py-4">
+        <InputGroup className="h-auto min-h-20 rounded-xl">
+          <InputGroupInput
             value={value}
             onChange={(e) => onChange(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={disabled}
-            className={cn(
-              'h-16 w-full rounded-xl pl-4 pr-14 text-lg',
-              'text-amber-50 placeholder:text-amber-700/50',
-              'focus-visible:border-amber-500 focus-visible:ring-amber-500/20',
-              'disabled:opacity-50',
-            )}
+            className="text-lg pb-2"
           />
-
-          {/* Search Button - Icon only, inside input */}
-          <Button
-            onClick={onSubmit}
-            disabled={disabled || !value.trim()}
-            size="icon"
-            className={cn(
-              'absolute right-2 top-1/2 -translate-y-1/2',
-              'h-10 w-10 rounded-lg bg-amber-600 text-amber-950',
-              'hover:bg-amber-500',
-              'disabled:opacity-30',
-            )}
-          >
-            <RiSearchLine className="h-5 w-5" />
-          </Button>
-
-          {/* Bottom row - Mode selector & Collection inside input area */}
-          <div className="absolute bottom-1 left-4 flex items-center gap-3">
-            {/* Mode Selector - Compact */}
-            <Select
-              value={mode}
-              onValueChange={(v) => onModeChange(v as SearchMode)}
-              disabled={disabled}
-            >
-              <SelectTrigger
-                className={cn(
-                  'h-6 w-auto min-w-[80px] border-0 bg-transparent px-0 text-xs',
-                  'text-amber-600 focus:ring-0',
-                  'disabled:opacity-50 hover:text-amber-500',
-                )}
-              >
-                <SelectValue placeholder={currentMode?.shortLabel} />
-              </SelectTrigger>
-              <SelectContent className="rounded-lg">
-                {searchModeOptions.map((option) => (
-                  <SelectItem
-                    key={option.value}
-                    value={option.value}
-                    className="text-xs text-amber-200 focus:bg-amber-900/30 focus:text-amber-100"
+          <div className="h-2" />
+          <InputGroupAddon align="block-end" className="border-t pt-1.5">
+            <div className="flex w-full items-center justify-between">
+              {/* Left side: Mode selector + Collection */}
+              <div className="flex items-center gap-3">
+                {/* Mode Selector */}
+                <Select
+                  value={mode}
+                  onValueChange={(v) => onModeChange(v as SearchMode)}
+                  disabled={disabled}
+                >
+                  <SelectTrigger
+                    className={cn('h-6 w-auto min-w-52', 'text-xs text-center')}
                   >
-                    <span className="font-medium">{option.shortLabel}</span>
-                    <span className="ml-2 text-amber-600">{option.label}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                    <SelectValue placeholder={currentMode?.shortLabel} />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-lg ">
+                    {searchModeOptions.map((option) => (
+                      <SelectItem
+                        key={option.value}
+                        value={option.value}
+                        className="text-xs px-2 w-52"
+                      >
+                        <Badge variant={'outline'} className="font-sm">
+                          {option.shortLabel}
+                        </Badge>
+                        <span className="">{option.label}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
 
-            {/* Collection Indicator - Small text */}
-            <div className="flex items-center gap-1 text-xs text-amber-700">
-              <RiDatabase2Line className="h-3 w-3" />
-              <span className="truncate max-w-[150px]">
-                {selectedCollection || 'All Collections'}
-              </span>
+                {/* Collection Indicator */}
+                <InputGroupText className="text-xs text-amber-700">
+                  <RiDatabase2Line className="h-3 w-3" />
+                  <span className="truncate max-w-37.5">
+                    {selectedCollection || 'All Collections'}
+                  </span>
+                </InputGroupText>
+              </div>
             </div>
-          </div>
-        </div>
+
+            <Button
+              onClick={onSubmit}
+              disabled={disabled || !value.trim()}
+              variant={'default'}
+              className={'bg-red-400'}
+            >
+              <RiSearchLine className="h-4 w-4" />
+            </Button>
+          </InputGroupAddon>
+        </InputGroup>
       </div>
     </div>
   )

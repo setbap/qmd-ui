@@ -21,7 +21,11 @@ interface UseAppSearchReturn {
   results: SearchResult[]
   isLoading: boolean
   error: Error | null
-  executeSearch: () => void
+  executeSearch: (params?: {
+    query?: string
+    mode?: SearchMode
+    collection?: string | null
+  }) => void
 }
 
 export function useAppSearch(): UseAppSearchReturn {
@@ -40,19 +44,31 @@ export function useAppSearch(): UseAppSearchReturn {
     (searchParams as Record<string, string | undefined>).c ?? null,
   )
 
-  // Update URL when search params change
-  const updateUrl = useCallback(() => {
-    const params: Record<string, string> = {}
-    if (query) params.q = query
-    if (mode !== 'query') params.m = mode
-    if (collection) params.c = collection
+  // Update URL with given params
+  const updateUrl = useCallback(
+    (
+      params: {
+        query?: string
+        mode?: SearchMode
+        collection?: string | null
+      } = {},
+    ) => {
+      const searchParams: Record<string, string> = {}
+      const q = params.query ?? query
+      const m = params.mode ?? mode
+      const c = params.collection !== undefined ? params.collection : collection
 
-    navigate({
-      to: '/',
-      search: params,
-      replace: true,
-    })
-  }, [query, mode, collection, navigate])
+      if (q) searchParams.q = q
+      if (m !== 'query') searchParams.m = m
+      if (c) searchParams.c = c
+      navigate({
+        to: '/',
+        search: searchParams,
+        replace: true,
+      })
+    },
+    [query, mode, collection, navigate],
+  )
 
   // Search query
   const searchQuery = useQuery({
@@ -73,11 +89,22 @@ export function useAppSearch(): UseAppSearchReturn {
     staleTime: 1000 * 60, // 1 minute
   })
 
-  // Execute search
-  const executeSearch = useCallback(() => {
-    updateUrl()
-    searchQuery.refetch()
-  }, [updateUrl, searchQuery])
+  // Execute search with current or provided params
+  const executeSearch = useCallback(
+    (params?: {
+      query?: string
+      mode?: SearchMode
+      collection?: string | null
+    }) => {
+      updateUrl(params)
+      // Refetch with current state (queryKey will have latest values after state updates)
+      const searchQuery_val = params?.query ?? query
+      if (searchQuery_val.trim()) {
+        searchQuery.refetch()
+      }
+    },
+    [updateUrl, searchQuery, query],
+  )
 
   // Cycle through search modes
   const cycleMode = useCallback(() => {

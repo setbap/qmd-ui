@@ -21,7 +21,6 @@ import {
   RiSearchLine,
   RiSparklingLine,
   RiDatabase2Line,
-  RiCommandLine,
 } from '@remixicon/react'
 
 type CommandAction =
@@ -33,12 +32,10 @@ type CommandAction =
   | 'search'
   | 'vsearch'
   | 'query'
-  | 'close'
 
 interface CommandOption {
   id: string
-  name: string
-  description: string
+  label: string
   action: CommandAction
   icon: React.ReactNode
   shortcut?: string
@@ -50,25 +47,22 @@ const commandGroups: { heading: string; commands: CommandOption[] }[] = [
     commands: [
       {
         id: 'create-collection',
-        name: 'Create Collection',
-        description: 'Add a new collection with path and pattern',
+        label: 'Create Collection',
         action: 'createCollection',
-        icon: <RiAddCircleLine className="h-4 w-4" />,
-        shortcut: 'Ctrl+N',
+        icon: <RiAddCircleLine className="size-4" />,
+        shortcut: '⌘N',
       },
       {
         id: 'update-collection',
-        name: 'Update Collection',
-        description: 'Re-index an existing collection',
+        label: 'Update Collection',
         action: 'updateCollection',
-        icon: <RiRefreshLine className="h-4 w-4" />,
+        icon: <RiRefreshLine className="size-4" />,
       },
       {
         id: 'delete-collection',
-        name: 'Delete Collection',
-        description: 'Remove a collection from the index',
+        label: 'Delete Collection',
         action: 'deleteCollection',
-        icon: <RiDeleteBinLine className="h-4 w-4" />,
+        icon: <RiDeleteBinLine className="size-4" />,
       },
     ],
   },
@@ -77,27 +71,24 @@ const commandGroups: { heading: string; commands: CommandOption[] }[] = [
     commands: [
       {
         id: 'search',
-        name: 'Text Search',
-        description: 'BM25 full-text search',
+        label: 'Text Search',
         action: 'search',
-        icon: <RiSearchLine className="h-4 w-4" />,
-        shortcut: 'Ctrl+1',
+        icon: <RiSearchLine className="size-4" />,
+        shortcut: '⌘1',
       },
       {
         id: 'vsearch',
-        name: 'Vector Search',
-        description: 'Vector similarity search with embeddings',
+        label: 'Vector Search',
         action: 'vsearch',
-        icon: <RiSparklingLine className="h-4 w-4" />,
-        shortcut: 'Ctrl+2',
+        icon: <RiSparklingLine className="size-4" />,
+        shortcut: '⌘2',
       },
       {
         id: 'query',
-        name: 'Hybrid Query',
-        description: 'Hybrid search with reranking (best quality)',
+        label: 'Hybrid Query',
         action: 'query',
-        icon: <RiDatabase2Line className="h-4 w-4" />,
-        shortcut: 'Ctrl+3',
+        icon: <RiDatabase2Line className="size-4" />,
+        shortcut: '⌘3',
       },
     ],
   },
@@ -106,11 +97,10 @@ const commandGroups: { heading: string; commands: CommandOption[] }[] = [
     commands: [
       {
         id: 'embed',
-        name: 'Generate Embeddings',
-        description: 'Create vector embeddings for all collections',
+        label: 'Generate Embeddings',
         action: 'embed',
-        icon: <RiSparklingLine className="h-4 w-4" />,
-        shortcut: 'Ctrl+E',
+        icon: <RiSparklingLine className="size-4" />,
+        shortcut: '⌘E',
       },
     ],
   },
@@ -119,11 +109,10 @@ const commandGroups: { heading: string; commands: CommandOption[] }[] = [
     commands: [
       {
         id: 'settings',
-        name: 'Settings',
-        description: 'Configure app preferences',
+        label: 'Settings',
         action: 'settings',
-        icon: <RiSettings3Line className="h-4 w-4" />,
-        shortcut: 'Ctrl+,',
+        icon: <RiSettings3Line className="size-4" />,
+        shortcut: '⌘,',
       },
     ],
   },
@@ -147,19 +136,11 @@ export function CommandPalette({
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <Command
-        className={cn(
-          'rounded-lg border',
-          '[&_[cmdk-group-heading]]:text-amber-600',
-        )}
-      >
-        <CommandInput
-          placeholder="Type a command or search..."
-          className="border-0 bg-transparent text-amber-100 placeholder:text-amber-700"
-        />
-        <CommandList className="max-h-[60vh] overflow-y-auto">
-          <CommandEmpty className="py-6 text-center text-sm text-amber-600">
-            No commands found.
+      <Command>
+        <CommandInput placeholder="Type a command or search..." />
+        <CommandList>
+          <CommandEmpty className="py-6 text-center text-sm ">
+            No results found.
           </CommandEmpty>
 
           {commandGroups.map((group, groupIndex) => (
@@ -172,22 +153,12 @@ export function CommandPalette({
                   <CommandItem
                     key={command.id}
                     onSelect={() => handleSelect(command.action)}
-                    className={cn(
-                      'rounded-md text-amber-100',
-                      'data-[selected=true]:bg-amber-900/30 data-[selected=true]:text-amber-50',
-                      '[&_svg]:text-amber-600 data-[selected=true]:[&_svg]:text-amber-300',
-                    )}
                   >
                     {command.icon}
-                    <div className="flex flex-col">
-                      <span className="font-medium">{command.name}</span>
-                      <span className="text-xs text-amber-600">
-                        {command.description}
-                      </span>
-                    </div>
+                    <span>{command.label}</span>
                     {command.shortcut && (
-                      <CommandShortcut className="text-amber-700">
-                        <kbd className="rounded border bg-amber-950 px-1.5 py-0.5 font-mono text-xs">
+                      <CommandShortcut className="">
+                        <kbd className="rounded border border-amber-800 bg-amber-950 px-1.5 py-0.5 font-mono text-xs">
                           {command.shortcut}
                         </kbd>
                       </CommandShortcut>
@@ -197,25 +168,6 @@ export function CommandPalette({
               </CommandGroup>
             </React.Fragment>
           ))}
-
-          <CommandSeparator className="bg-amber-900/30" />
-          <CommandGroup>
-            <CommandItem
-              onSelect={() => handleSelect('close')}
-              className={cn(
-                'rounded-md text-amber-100',
-                'data-[selected=true]:bg-amber-900/30 data-[selected=true]:text-amber-50',
-              )}
-            >
-              <RiCommandLine className="h-4 w-4 text-amber-600" />
-              <span>Close Palette</span>
-              <CommandShortcut className="text-amber-700">
-                <kbd className="rounded border bg-amber-950 px-1.5 py-0.5 font-mono text-xs">
-                  Esc
-                </kbd>
-              </CommandShortcut>
-            </CommandItem>
-          </CommandGroup>
         </CommandList>
       </Command>
     </CommandDialog>

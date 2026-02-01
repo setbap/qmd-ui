@@ -37,13 +37,13 @@ export function FileViewer({
         {/* Custom Header */}
         <div className="flex items-center justify-between border-b px-4 py-3">
           <div className="flex items-center gap-3">
-            <RiFileTextLine className="h-5 w-5 text-amber-400" />
+            <RiFileTextLine className="h-5 w-5 " />
             <div>
               <DialogTitle className="text-sm font-medium text-amber-50">
                 {title}
               </DialogTitle>
               {path && (
-                <DialogDescription className="text-xs text-amber-600">
+                <DialogDescription className="text-xs ">
                   {path}
                 </DialogDescription>
               )}
@@ -53,7 +53,7 @@ export function FileViewer({
             variant="ghost"
             size="icon-sm"
             onClick={() => onOpenChange(false)}
-            className="h-8 w-8 text-amber-600 hover:bg-amber-900/30 hover:text-amber-200"
+            className="h-8 w-8"
           >
             <RiCloseLine className="h-5 w-5" />
             <span className="sr-only">Close</span>
@@ -66,7 +66,7 @@ export function FileViewer({
             <pre
               className={cn(
                 'whitespace-pre-wrap break-words font-mono text-sm leading-relaxed',
-                'text-amber-100',
+                '',
               )}
             >
               {content}
@@ -76,14 +76,14 @@ export function FileViewer({
 
         {/* Footer */}
         <div className="flex items-center justify-between border-t px-4 py-3">
-          <span className="text-xs text-amber-600">
+          <span className="text-xs ">
             {content.length.toLocaleString()} characters
           </span>
           <Button
             variant="outline"
             size="sm"
             onClick={() => onOpenChange(false)}
-            className="h-8 rounded-lg bg-transparent text-amber-300 hover:bg-amber-900/30 hover:text-amber-100"
+            className="h-8 rounded-lg"
           >
             Close
           </Button>

@@ -75,13 +75,13 @@ export function CreateCollectionDialog({
         <DialogHeader>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
-              <RiFolderAddLine className="h-5 w-5 text-amber-400" />
+              <RiFolderAddLine className="h-5 w-5 " />
             </div>
             <div>
               <DialogTitle className="text-lg font-medium text-amber-50">
                 Create Collection
               </DialogTitle>
-              <DialogDescription className="text-sm text-amber-600">
+              <DialogDescription className="text-sm ">
                 Add a new collection to index your documents
               </DialogDescription>
             </div>
@@ -91,10 +91,7 @@ export function CreateCollectionDialog({
         <form onSubmit={handleSubmit} className="space-y-4 py-4">
           {/* Name Input */}
           <div className="space-y-2">
-            <Label
-              htmlFor="name"
-              className="text-sm font-medium text-amber-100"
-            >
+            <Label htmlFor="name" className="text-sm font-medium ">
               Collection Name
             </Label>
             <Input
@@ -103,8 +100,7 @@ export function CreateCollectionDialog({
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., my-notes"
               className={cn(
-                'h-10 rounded-lg text-amber-100',
-                'placeholder:text-amber-700',
+                'h-10 rounded-lg ',
                 'focus-visible:border-amber-500 focus-visible:ring-amber-500/20',
                 errors.name && 'border-red-500/50 focus-visible:border-red-500',
               )}
@@ -116,22 +112,18 @@ export function CreateCollectionDialog({
 
           {/* Path Input */}
           <div className="space-y-2">
-            <Label
-              htmlFor="path"
-              className="text-sm font-medium text-amber-100"
-            >
+            <Label htmlFor="path" className="text-sm font-medium ">
               Path
             </Label>
             <div className="relative">
-              <RiFolderLine className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-amber-600" />
+              <RiFolderLine className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 " />
               <Input
                 id="path"
                 value={path}
                 onChange={(e) => setPath(e.target.value)}
                 placeholder="/path/to/documents"
                 className={cn(
-                  'h-10 rounded-lg pl-10 text-amber-100',
-                  'placeholder:text-amber-700',
+                  'h-10 rounded-lg pl-10 ',
                   'focus-visible:border-amber-500 focus-visible:ring-amber-500/20',
                   errors.path &&
                     'border-red-500/50 focus-visible:border-red-500',
@@ -141,7 +133,7 @@ export function CreateCollectionDialog({
             {errors.path ? (
               <p className="text-xs text-red-400">{errors.path}</p>
             ) : (
-              <p className="text-xs text-amber-600">
+              <p className="text-xs ">
                 Absolute path to the directory to index
               </p>
             )}
@@ -149,27 +141,23 @@ export function CreateCollectionDialog({
 
           {/* Pattern Input */}
           <div className="space-y-2">
-            <Label
-              htmlFor="pattern"
-              className="text-sm font-medium text-amber-100"
-            >
+            <Label htmlFor="pattern" className="text-sm font-medium ">
               File Pattern
             </Label>
             <div className="relative">
-              <RiFileListLine className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-amber-600" />
+              <RiFileListLine className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 " />
               <Input
                 id="pattern"
                 value={pattern}
                 onChange={(e) => setPattern(e.target.value)}
                 placeholder="**/*.md"
                 className={cn(
-                  'h-10 rounded-lg pl-10 text-amber-100',
-                  'placeholder:text-amber-700',
+                  'h-10 rounded-lg pl-10 ',
                   'focus-visible:border-amber-500 focus-visible:ring-amber-500/20',
                 )}
               />
             </div>
-            <p className="text-xs text-amber-600">
+            <p className="text-xs ">
               Glob pattern for matching files (default: **/*.md)
             </p>
           </div>
@@ -180,7 +168,7 @@ export function CreateCollectionDialog({
             type="button"
             variant="outline"
             onClick={() => onOpenChange(false)}
-            className="h-9 rounded-lg bg-transparent text-amber-300 hover:bg-amber-900/30 hover:text-amber-100"
+            className="h-9 rounded-lg bg-transparent  hover:bg-amber-900/30"
           >
             Cancel
           </Button>
@@ -188,7 +176,7 @@ export function CreateCollectionDialog({
             type="submit"
             onClick={handleSubmit}
             disabled={!name.trim() || !path.trim()}
-            className="h-9 rounded-lg bg-amber-500 px-6 text-white hover:bg-amber-600 disabled:opacity-50"
+            className="h-9 rounded-lg bg-amber-500 px-6 hover:bg-amber-600 disabled:opacity-50"
           >
             Create
           </Button>

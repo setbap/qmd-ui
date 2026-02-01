@@ -14,8 +14,10 @@ import { useFileContent } from '@/hooks/useFileContent'
 import { useSettings } from '@/hooks/useSettings'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
-import { embedCollection, clearIndexCache } from '@/lib/server/qmd'
+import { embedCollection } from '@/lib/server/qmd'
 import type { SearchResult } from '@/components/SearchResults'
+import { Button } from '@/components/ui/button'
+import { Kbd } from '@/components/ui/kbd'
 
 export const Route = createFileRoute('/')({
   component: HomeComponent,
@@ -40,40 +42,56 @@ function HomeComponent() {
   const fileContent = useFileContent(viewingFile, viewingCollection)
 
   // Command palette actions
-  const handleCommandAction = useCallback(async (action: string) => {
-    setIsCommandPaletteOpen(false)
+  const handleCommandAction = useCallback(
+    async (
+      action:
+        | 'createCollection'
+        | 'updateCollection'
+        | 'deleteCollection'
+        | 'embed'
+        | 'settings'
+        | 'search'
+        | 'vsearch'
+        | 'query',
+    ) => {
+      setIsCommandPaletteOpen(false)
 
-    switch (action) {
-      case 'search':
-        // Focus search input (implement via ref if needed)
-        break
-      case 'createCollection':
-        setIsCreateDialogOpen(true)
-        break
-      case 'settings':
-        setIsSettingsOpen(true)
-        break
-      case 'embed':
-        try {
-          toast.promise(embedCollection(), {
-            loading: 'Generating embeddings...',
-            success: 'Embeddings generated successfully',
-            error: 'Failed to generate embeddings',
-          })
-        } catch {
-          toast.error('Failed to start embedding')
-        }
-        break
-      case 'clearCache':
-        try {
-          await clearIndexCache()
-          toast.success('Cache cleared')
-        } catch {
-          toast.error('Failed to clear cache')
-        }
-        break
-    }
-  }, [])
+      switch (action) {
+        case 'search':
+        case 'vsearch':
+        case 'query':
+          // Set search mode and focus search input
+          search.setMode(action)
+          break
+        case 'createCollection':
+          setIsCreateDialogOpen(true)
+          break
+        case 'updateCollection':
+          // TODO: Show collection selection dialog
+          toast.info('Select a collection to update')
+          break
+        case 'deleteCollection':
+          // TODO: Show collection selection dialog
+          toast.info('Select a collection to delete')
+          break
+        case 'settings':
+          setIsSettingsOpen(true)
+          break
+        case 'embed':
+          try {
+            toast.promise(embedCollection(), {
+              loading: 'Generating embeddings...',
+              success: 'Embeddings generated successfully',
+              error: 'Failed to generate embeddings',
+            })
+          } catch {
+            toast.error('Failed to start embedding')
+          }
+          break
+      }
+    },
+    [search],
+  )
 
   // Handle collection selection
   const handleCollectionSelect = useCallback(
@@ -81,7 +99,7 @@ function HomeComponent() {
       search.selectCollection(name)
       // Re-run search if there's a query
       if (search.query.trim()) {
-        search.executeSearch()
+        search.executeSearch({ collection: name })
       }
     },
     [search],
@@ -106,29 +124,54 @@ function HomeComponent() {
     <>
       <Layout
         commandPalette={
-          <button
+          <Button
+            size={'lg'}
+            variant={'outline'}
             onClick={() => setIsCommandPaletteOpen(true)}
-            className="flex items-center gap-2 rounded-lg border border-slate-700 bg-[#1a1d23] px-4 py-2 text-sm text-slate-400 transition-colors hover:border-slate-600 hover:text-slate-300"
           >
             <span>Search commands...</span>
-            <kbd className="rounded border border-slate-700 bg-slate-800 px-2 py-0.5 text-xs">
-              ⌘K
-            </kbd>
-          </button>
+            <Kbd>⌘K</Kbd>
+          </Button>
         }
-        searchBar={
-          <SearchBar
-            value={search.query}
-            onChange={search.setQuery}
-            onSubmit={search.executeSearch}
-            mode={search.mode}
-            onModeChange={search.setMode}
+        searchBar={<></>}
+        sideBar={
+          <CollectionPanel
+            collections={collections.collections}
+            isLoading={collections.isLoading}
             selectedCollection={search.collection}
+            expandedCollections={collections.expandedCollections}
+            onSelectCollection={handleCollectionSelect}
+            onToggleExpand={collections.toggleExpand}
+            onUpdateCollection={async (name) => {
+              try {
+                await collections.updateCollection(name)
+                toast.success(`Collection "${name}" updated`)
+              } catch {
+                toast.error(`Failed to update collection "${name}"`)
+              }
+            }}
+            onDeleteCollection={async (name) => {
+              try {
+                await collections.deleteCollection(name)
+                toast.success(`Collection "${name}" deleted`)
+              } catch {
+                toast.error(`Failed to delete collection "${name}"`)
+              }
+            }}
+            onRenameCollection={async (oldName, newName) => {
+              try {
+                await collections.renameCollection({ oldName, newName })
+                toast.success(`Collection renamed to "${newName}"`)
+              } catch {
+                toast.error(`Failed to rename collection "${oldName}"`)
+              }
+            }}
+            onCreateCollection={() => setIsCreateDialogOpen(true)}
+            getCollectionFiles={collections.fetchCollectionFiles}
           />
         }
       >
         <div className="flex w-full gap-4">
-          {/* Search Results - 70% */}
           <div className="flex h-full w-full flex-col">
             <SearchResults
               results={search.results}
@@ -138,33 +181,15 @@ function HomeComponent() {
             />
           </div>
 
-          {/* Collection Panel - 30% */}
-          <div className="flex h-full w-100 flex-col">
-            <CollectionPanel
-              collections={collections.collections}
-              isLoading={collections.isLoading}
-              selectedCollection={search.collection}
-              expandedCollections={collections.expandedCollections}
-              onSelectCollection={handleCollectionSelect}
-              onToggleExpand={collections.toggleExpand}
-              onUpdateCollection={async (name) => {
-                try {
-                  await collections.updateCollection(name)
-                  toast.success(`Collection "${name}" updated`)
-                } catch {
-                  toast.error(`Failed to update collection "${name}"`)
-                }
-              }}
-              onDeleteCollection={async (name) => {
-                try {
-                  await collections.deleteCollection(name)
-                  toast.success(`Collection "${name}" deleted`)
-                } catch {
-                  toast.error(`Failed to delete collection "${name}"`)
-                }
-              }}
-            />
-          </div>
+          <div className="h-20 py-1"></div>
+          <SearchBar
+            value={search.query}
+            onChange={search.setQuery}
+            onSubmit={search.executeSearch}
+            mode={search.mode}
+            onModeChange={search.setMode}
+            selectedCollection={search.collection}
+          />
         </div>
       </Layout>
 

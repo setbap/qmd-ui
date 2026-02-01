@@ -45,23 +45,35 @@ export function useCollections() {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [queryClient])
 
-  // Collection files query (for expanded collections)
+  // Collection files - direct async function for components
+  const fetchCollectionFiles = useCallback(
+    async (collectionName: string): Promise<Array<{ path: string; title?: string }>> => {
+      const result = await getCollectionFiles({
+        query: { name: collectionName },
+      } as any)
+      // Map the string paths to FileInfo objects
+      return result.map((path: string) => ({
+        path,
+        title: path.split('/').pop(),
+      }))
+    },
+    []
+  )
+
+  // Collection files query (for expanded collections - hook version)
   const getCollectionFilesQuery = useCallback(
     (collectionName: string | null) => {
       return useQuery({
         queryKey: [COLLECTION_FILES_KEY, collectionName],
         queryFn: async () => {
           if (!collectionName) return []
-          const result = await getCollectionFiles({
-            query: { name: collectionName },
-          } as any)
-          return result
+          return fetchCollectionFiles(collectionName)
         },
         enabled: !!collectionName && expandedCollections.has(collectionName),
         staleTime: 1000 * 60, // 1 minute
       })
     },
-    [expandedCollections],
+    [expandedCollections, fetchCollectionFiles],
   )
 
   // Toggle collection expansion
@@ -133,6 +145,7 @@ export function useCollections() {
     expandedCollections,
     toggleExpand,
     getCollectionFilesQuery,
+    fetchCollectionFiles,
     createCollection: createMutation.mutateAsync,
     deleteCollection: deleteMutation.mutateAsync,
     renameCollection: renameMutation.mutateAsync,

@@ -1,17 +1,61 @@
 'use client'
 
-import { Button } from '@/components/ui/button'
-import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { useState, useCallback } from 'react'
 import {
-  RiAddLine,
-  RiSubtractLine,
-  RiRefreshLine,
-  RiDeleteBinLine,
   RiFolderLine,
   RiFileTextLine,
+  RiMoreLine,
+  RiRefreshLine,
+  RiDeleteBinLine,
+  RiEditLine,
+  RiInformationLine,
+  RiArrowRightSLine,
+  RiDatabase2Line,
+  RiAddLine,
 } from '@remixicon/react'
 import { cn } from '@/lib/utils'
+
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarSeparator,
+  SidebarFooter,
+} from '@/components/ui/sidebar'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Badge } from '@/components/ui/badge'
+import { toast } from 'sonner'
 
 // Collection type matching what the server returns (from YAML config)
 interface Collection {
@@ -20,7 +64,12 @@ interface Collection {
   pattern: string
   context?: Record<string, string>
   update?: string
-  files?: string[]
+}
+
+// File info from the database
+interface FileInfo {
+  path: string
+  title?: string
 }
 
 interface CollectionPanelProps {
@@ -29,8 +78,11 @@ interface CollectionPanelProps {
   onSelectCollection: (name: string | null) => void
   expandedCollections: Set<string>
   onToggleExpand: (name: string) => void
-  onUpdateCollection: (name: string) => void
-  onDeleteCollection: (name: string) => void
+  onUpdateCollection: (name: string) => Promise<void>
+  onDeleteCollection: (name: string) => Promise<void>
+  onRenameCollection: (oldName: string, newName: string) => Promise<void>
+  onCreateCollection: () => void
+  getCollectionFiles: (name: string) => Promise<FileInfo[]>
   isLoading?: boolean
   error?: Error | null
 }
@@ -43,205 +95,573 @@ export function CollectionPanel({
   onToggleExpand,
   onUpdateCollection,
   onDeleteCollection,
+  onRenameCollection,
+  onCreateCollection,
+  getCollectionFiles,
   isLoading = false,
   error = null,
 }: CollectionPanelProps) {
-  return (
-    <div className={cn('flex h-full w-full flex-col border-l  ')}>
-      {/* Header */}
-      <div className="flex items-center justify-between border-b  px-4 py-3">
-        <h2 className="text-sm font-medium text-amber-100">Collections</h2>
-        <span className="text-xs text-amber-600">
-          {collections.length} total
-        </span>
-      </div>
+  // State for rename dialog
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false)
+  const [collectionToRename, setCollectionToRename] = useState<string | null>(
+    null,
+  )
+  const [newName, setNewName] = useState('')
+  const [isRenaming, setIsRenaming] = useState(false)
 
-      {/* Content */}
-      <ScrollArea className="flex-1">
-        <div className="p-2">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="h-5 w-5 animate-spin rounded-full border-1" />
-            </div>
-          ) : error ? (
-            <div className="px-4 py-4 text-sm text-red-400">
-              Error: {error.message}
-            </div>
-          ) : collections.length === 0 ? (
-            <div className="px-4 py-8 text-center">
-              <p className="text-sm text-amber-700">No collections found</p>
-              <p className="mt-1 text-xs text-amber-800">
-                Create a collection to get started
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-1">
+  // State for delete confirmation
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [collectionToDelete, setCollectionToDelete] = useState<string | null>(
+    null,
+  )
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  // State for info dialog
+  const [infoDialogOpen, setInfoDialogOpen] = useState(false)
+  const [collectionToInfo, setCollectionToInfo] = useState<Collection | null>(
+    null,
+  )
+
+  // State for collection files
+  const [collectionFiles, setCollectionFiles] = useState<
+    Record<string, FileInfo[]>
+  >({})
+  const [loadingFiles, setLoadingFiles] = useState<Record<string, boolean>>({})
+
+  // Fetch files when collection is expanded
+  const handleToggleExpand = useCallback(
+    async (collectionName: string) => {
+      const isExpanding = !expandedCollections.has(collectionName)
+      onToggleExpand(collectionName)
+
+      if (isExpanding && !collectionFiles[collectionName]) {
+        setLoadingFiles((prev) => ({ ...prev, [collectionName]: true }))
+        try {
+          const files = await getCollectionFiles(collectionName)
+          setCollectionFiles((prev) => ({ ...prev, [collectionName]: files }))
+        } catch (err) {
+          toast.error(`Failed to load files for ${collectionName}`)
+        } finally {
+          setLoadingFiles((prev) => ({ ...prev, [collectionName]: false }))
+        }
+      }
+    },
+    [expandedCollections, onToggleExpand, getCollectionFiles, collectionFiles],
+  )
+
+  // Handle collection selection
+  const handleSelectCollection = useCallback(
+    (name: string | null) => {
+      onSelectCollection(name)
+    },
+    [onSelectCollection],
+  )
+
+  // Handle update action
+  const handleUpdate = useCallback(
+    async (collectionName: string) => {
+      try {
+        await onUpdateCollection(collectionName)
+        toast.success(`Collection "${collectionName}" updated successfully`)
+        // Refresh files after update
+        setCollectionFiles((prev) => {
+          const next = { ...prev }
+          delete next[collectionName]
+          return next
+        })
+        // Reload files if expanded
+        if (expandedCollections.has(collectionName)) {
+          setLoadingFiles((prev) => ({ ...prev, [collectionName]: true }))
+          const files = await getCollectionFiles(collectionName)
+          setCollectionFiles((prev) => ({ ...prev, [collectionName]: files }))
+          setLoadingFiles((prev) => ({ ...prev, [collectionName]: false }))
+        }
+      } catch (err) {
+        toast.error(`Failed to update collection "${collectionName}"`)
+      }
+    },
+    [onUpdateCollection, expandedCollections, getCollectionFiles],
+  )
+
+  // Handle delete action
+  const handleDeleteClick = useCallback((collectionName: string) => {
+    setCollectionToDelete(collectionName)
+    setDeleteDialogOpen(true)
+  }, [])
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!collectionToDelete) return
+    setIsDeleting(true)
+    try {
+      await onDeleteCollection(collectionToDelete)
+      toast.success(`Collection "${collectionToDelete}" deleted`)
+      // Clear files from state
+      setCollectionFiles((prev) => {
+        const next = { ...prev }
+        delete next[collectionToDelete]
+        return next
+      })
+      // If the deleted collection was selected, select all
+      if (selectedCollection === collectionToDelete) {
+        onSelectCollection(null)
+      }
+      setDeleteDialogOpen(false)
+    } catch (err) {
+      toast.error(`Failed to delete collection "${collectionToDelete}"`)
+    } finally {
+      setIsDeleting(false)
+      setCollectionToDelete(null)
+    }
+  }, [
+    collectionToDelete,
+    onDeleteCollection,
+    selectedCollection,
+    onSelectCollection,
+  ])
+
+  // Handle rename action
+  const handleRenameClick = useCallback((collectionName: string) => {
+    setCollectionToRename(collectionName)
+    setNewName(collectionName)
+    setRenameDialogOpen(true)
+  }, [])
+
+  const handleConfirmRename = useCallback(async () => {
+    if (
+      !collectionToRename ||
+      !newName.trim() ||
+      newName === collectionToRename
+    ) {
+      setRenameDialogOpen(false)
+      return
+    }
+    setIsRenaming(true)
+    try {
+      await onRenameCollection(collectionToRename, newName.trim())
+      toast.success(
+        `Collection renamed from "${collectionToRename}" to "${newName}"`,
+      )
+      // Update selected collection if it was the renamed one
+      if (selectedCollection === collectionToRename) {
+        onSelectCollection(newName.trim())
+      }
+      // Clear files from state (they'll be reloaded)
+      setCollectionFiles((prev) => {
+        const next = { ...prev }
+        delete next[collectionToRename]
+        return next
+      })
+      setRenameDialogOpen(false)
+    } catch (err) {
+      toast.error(`Failed to rename collection "${collectionToRename}"`)
+    } finally {
+      setIsRenaming(false)
+      setCollectionToRename(null)
+      setNewName('')
+    }
+  }, [
+    collectionToRename,
+    newName,
+    onRenameCollection,
+    selectedCollection,
+    onSelectCollection,
+  ])
+
+  // Handle info action
+  const handleInfoClick = useCallback((collection: Collection) => {
+    setCollectionToInfo(collection)
+    setInfoDialogOpen(true)
+  }, [])
+
+  // Get file count for a collection
+  const getFileCount = useCallback(
+    (collectionName: string) => {
+      return collectionFiles[collectionName]?.length ?? 0
+    },
+    [collectionFiles],
+  )
+
+  return (
+    <>
+      <Sidebar
+        side="right"
+        collapsible="offcanvas"
+        className="border-l bg-black/50"
+      >
+        <SidebarHeader className="p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold tracking-wide  uppercase">
+              Collections
+            </h2>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7  hover:bg-amber-900/30"
+              onClick={onCreateCollection}
+              title="Create new collection"
+            >
+              <RiAddLine className="h-4 w-4" />
+            </Button>
+          </div>
+        </SidebarHeader>
+
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel className="">
+              {collections.length}{' '}
+              {collections.length === 1 ? 'Collection' : 'Collections'}
+            </SidebarGroupLabel>
+            <SidebarMenu className="space-y-2">
               {/* All Collections Option */}
-              <button
-                onClick={() => onSelectCollection(null)}
-                className={cn(
-                  'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left',
-                  'transition-colors',
-                  selectedCollection === null
-                    ? 'bg-amber-500/10 text-amber-400'
-                    : 'text-amber-200 hover:bg-amber-900/20',
-                )}
-              >
-                <div
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={selectedCollection === null}
+                  onClick={() => handleSelectCollection(null)}
+                  tooltip="All Collections"
                   className={cn(
-                    'flex h-4 w-4 items-center justify-center rounded-full border',
+                    'group/menu-button',
                     selectedCollection === null
-                      ? 'border-amber-500 bg-amber-500'
-                      : 'border-amber-700',
+                      ? 'bg-amber-500/10 '
+                      : ' hover:bg-amber-900/30 hover:',
                   )}
                 >
+                  <RiDatabase2Line className="h-4 w-4 shrink-0  group-data-[active=true]/menu-button:" />
+                  <span className="truncate">All Collections</span>
                   {selectedCollection === null && (
-                    <div className="h-1.5 w-1.5 rounded-full" />
+                    <Badge
+                      variant="secondary"
+                      className="ml-auto shrink-0 bg-amber-500/20  text-xs"
+                    >
+                      Active
+                    </Badge>
                   )}
-                </div>
-                <RiFolderLine className="h-4 w-4 text-amber-600" />
-                <span className="text-sm">All Collections</span>
-              </button>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
 
               {/* Collection Items */}
-              {collections.map((collection) => {
-                const isSelected = selectedCollection === collection.name
-                const isExpanded = expandedCollections.has(collection.name)
+              {isLoading ? (
+                <div className="px-4 py-8 flex items-center justify-center">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-amber-600 border-t-transparent" />
+                </div>
+              ) : error ? (
+                <div className="px-4 py-4 text-sm text-red-400">
+                  Error: {error.message}
+                </div>
+              ) : collections.length === 0 ? (
+                <div className="px-4 py-8 text-center">
+                  <p className="text-sm ">No collections found</p>
+                  <p className="mt-1 text-xs ">
+                    Create a collection to get started
+                  </p>
+                </div>
+              ) : (
+                collections.map((collection) => {
+                  const isSelected = selectedCollection === collection.name
+                  const isExpanded = expandedCollections.has(collection.name)
+                  const files = collectionFiles[collection.name] || []
+                  const isLoadingFiles = loadingFiles[collection.name]
 
-                return (
-                  <Collapsible
-                    key={collection.name}
-                    open={isExpanded}
-                    onOpenChange={() => onToggleExpand(collection.name)}
-                  >
-                    <div className="rounded-lg">
-                      {/* Collection Row */}
-                      <div className="flex items-center gap-1">
-                        {/* Selection Radio */}
-                        <button
-                          onClick={() => onSelectCollection(collection.name)}
-                          className={cn(
-                            'flex flex-1 items-center gap-2 rounded-lg px-3 py-2 text-left',
-                            'transition-colors',
-                            isSelected
-                              ? 'bg-amber-500/10 text-amber-400'
-                              : 'text-amber-200 hover:bg-amber-900/20',
-                          )}
-                        >
-                          <div
+                  return (
+                    <Collapsible
+                      key={collection.name}
+                      open={isExpanded}
+                      onOpenChange={() => handleToggleExpand(collection.name)}
+                    >
+                      <SidebarMenuItem className="group/menu-item">
+                        {/* Main Collection Row */}
+                        <div className="flex items-center">
+                          {/* Expand/Collapse Chevron */}
+                          <CollapsibleTrigger
                             className={cn(
-                              'flex h-4 w-4 items-center justify-center rounded-full border',
-                              isSelected
-                                ? 'border-amber-500 bg-amber-500'
-                                : 'border-amber-700',
+                              'h-6 w-6 shrink-0 p-0  hover:bg-amber-900/30 transition-transform duration-200 inline-flex items-center justify-center rounded-md',
+                              isExpanded && 'rotate-90',
                             )}
                           >
-                            {isSelected && (
-                              <div className="h-1.5 w-1.5 rounded-full" />
+                            <RiArrowRightSLine className="h-4 w-4" />
+                            <span className="sr-only">
+                              {isExpanded ? 'Collapse' : 'Expand'}{' '}
+                              {collection.name}
+                            </span>
+                          </CollapsibleTrigger>
+
+                          {/* Collection Name Button - Selects the collection */}
+                          <SidebarMenuButton
+                            isActive={isSelected}
+                            onClick={() =>
+                              handleSelectCollection(collection.name)
+                            }
+                            tooltip={collection.name}
+                            className={cn(
+                              'flex-1 group/menu-button',
+                              isSelected
+                                ? 'bg-amber-500/10 '
+                                : ' hover:bg-amber-900/30 hover:',
                             )}
-                          </div>
-                          <RiFolderLine className="h-4 w-4 text-amber-600" />
-                          <span className="truncate text-sm">
-                            {collection.name}
-                          </span>
-                        </button>
+                          >
+                            <RiFolderLine className="h-4 w-4 shrink-0  group-data-[active=true]/menu-button:" />
+                            <span className="truncate">{collection.name}</span>
+                            {files.length > 0 && (
+                              <Badge
+                                variant="secondary"
+                                className="ml-auto shrink-0 bg-amber-900/30  text-[10px]"
+                              >
+                                {files.length}
+                              </Badge>
+                            )}
+                          </SidebarMenuButton>
 
-                        {/* Expand/Collapse Button */}
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-7 w-7 p-0 text-amber-600 hover:bg-amber-900/30 hover:text-amber-400"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            onToggleExpand(collection.name)
-                          }}
-                        >
-                          {isExpanded ? (
-                            <RiSubtractLine className="h-4 w-4" />
-                          ) : (
-                            <RiAddLine className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </div>
-
-                      {/* Expanded Content */}
-                      <CollapsibleContent>
-                        <div className="space-y-2 px-3 pb-3 pt-1">
-                          {/* Collection Details */}
-                           <div className="space-y-1 pl-6 text-xs">
-                             <div className="flex items-start gap-1">
-                               <span className="text-amber-700">Path:</span>
-                               <span className="truncate text-amber-600">
-                                 {collection.path}
-                               </span>
-                             </div>
-                             <div className="flex items-start gap-1">
-                               <span className="text-amber-700">Pattern:</span>
-                               <span className="font-mono text-amber-600">
-                                 {collection.pattern}
-                               </span>
-                             </div>
-                           </div>
-
-                          {/* Action Buttons */}
-                          <div className="flex items-center gap-1 pl-6">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                onUpdateCollection(collection.name)
-                              }
-                              className="h-6 px-2 text-xs text-amber-600 hover:bg-amber-900/30 hover:text-amber-400"
+                          {/* Actions Menu */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 p-0  hover:bg-amber-900/30"
+                              >
+                                <RiMoreLine className="h-4 w-4" />
+                                <span className="sr-only">
+                                  Actions for {collection.name}
+                                </span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              side="right"
+                              align="start"
+                              className="w-48"
                             >
-                              <RiRefreshLine className="mr-1 h-3 w-3" />
-                              Update
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() =>
-                                onDeleteCollection(collection.name)
-                              }
-                              className="h-6 px-2 text-xs text-amber-600 hover:bg-amber-900/30 hover:text-red-400"
-                            >
-                              <RiDeleteBinLine className="mr-1 h-3 w-3" />
-                              Delete
-                            </Button>
-                          </div>
+                              <DropdownMenuItem
+                                onClick={() => handleUpdate(collection.name)}
+                              >
+                                <RiRefreshLine className="mr-2 h-4 w-4" />
+                                Update (Re-index)
+                              </DropdownMenuItem>
 
-                          {/* Files List */}
-                          <div className="space-y-0.5 pl-6">
-                            <div className="mb-1 text-xs font-medium text-amber-700">
-                              Files:
-                            </div>
-                            {collection.files && collection.files.length > 0 ? (
-                              <div className="max-h-32 space-y-0.5 overflow-y-auto">
-                                {collection.files.map((file, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="flex items-center gap-1.5 text-xs text-amber-600"
-                                  >
-                                    <RiFileTextLine className="h-3 w-3 text-amber-800" />
-                                    <span className="truncate">{file}</span>
-                                  </div>
-                                ))}
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleRenameClick(collection.name)
+                                }
+                              >
+                                <RiEditLine className="mr-2 h-4 w-4" />
+                                Rename
+                              </DropdownMenuItem>
+
+                              <DropdownMenuItem
+                                onClick={() => handleInfoClick(collection)}
+                              >
+                                <RiInformationLine className="mr-2 h-4 w-4" />
+                                Info
+                              </DropdownMenuItem>
+
+                              <DropdownMenuSeparator className="bg-amber-900/30" />
+
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleDeleteClick(collection.name)
+                                }
+                                className="text-red-400 focus:bg-red-900/20 focus:text-red-300 cursor-pointer"
+                              >
+                                <RiDeleteBinLine className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+
+                        {/* Expanded Files List */}
+                        <CollapsibleContent>
+                          <SidebarMenuSub className="border-l-amber-900/30">
+                            {isLoadingFiles ? (
+                              <div className="py-2 px-2 flex items-center gap-2">
+                                <div className="h-3 w-3 animate-spin rounded-full border border-amber-600 border-t-transparent" />
+                                <span className="text-xs ">
+                                  Loading files...
+                                </span>
                               </div>
-                            ) : (
-                              <div className="text-xs text-amber-800">
+                            ) : files.length === 0 ? (
+                              <div className="py-2 px-2 text-xs ">
                                 No files indexed
                               </div>
+                            ) : (
+                              <ScrollArea className="max-h-48">
+                                <div className="space-y-0.5">
+                                  {files.map((file, idx) => (
+                                    <SidebarMenuSubItem
+                                      key={`${file.path}-${idx}`}
+                                    >
+                                      <SidebarMenuSubButton
+                                        className=" hover:bg-amber-900/20 cursor-pointer"
+                                        title={file.path}
+                                      >
+                                        <RiFileTextLine className="h-3 w-3 shrink-0 " />
+                                        <span className="truncate text-xs">
+                                          {file.title ||
+                                            file.path.split('/').pop() ||
+                                            file.path}
+                                        </span>
+                                      </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                  ))}
+                                </div>
+                              </ScrollArea>
                             )}
-                          </div>
-                        </div>
-                      </CollapsibleContent>
-                    </div>
-                  </Collapsible>
-                )
-              })}
+                          </SidebarMenuSub>
+                        </CollapsibleContent>
+                      </SidebarMenuItem>
+                    </Collapsible>
+                  )
+                })
+              )}
+            </SidebarMenu>
+          </SidebarGroup>
+        </SidebarContent>
+
+        <SidebarFooter className="p-4">
+          <div className="text-xs ">made by sina and ai</div>
+        </SidebarFooter>
+      </Sidebar>
+
+      {/* Rename Dialog */}
+      <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="">Rename Collection</DialogTitle>
+            <DialogDescription className="">
+              Enter a new name for the collection.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="name" className="">
+                Collection Name
+              </Label>
+              <Input
+                id="name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                placeholder="Enter new name"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleConfirmRename()
+                  }
+                }}
+              />
             </div>
-          )}
-        </div>
-      </ScrollArea>
-    </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRenameDialogOpen(false)}
+              className="border-amber-900/30  hover:bg-amber-900/30"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmRename}
+              disabled={
+                isRenaming || !newName.trim() || newName === collectionToRename
+              }
+            >
+              {isRenaming ? 'Renaming...' : 'Rename'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-400">
+              Delete Collection
+            </DialogTitle>
+            <DialogDescription className="">
+              Are you sure you want to delete "{collectionToDelete}"? This
+              action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+              className="border-amber-900/30  hover:bg-amber-900/30"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmDelete}
+              disabled={isDeleting}
+              className="bg-red-600 hover:bg-red-700 "
+            >
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Info Dialog */}
+      <Dialog open={infoDialogOpen} onOpenChange={setInfoDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className=" flex items-center gap-2">
+              <RiFolderLine className="h-5 w-5 " />
+              {collectionToInfo?.name}
+            </DialogTitle>
+            <DialogDescription className="">
+              Collection details and configuration
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-3">
+              <div className="grid grid-cols-[100px_1fr] gap-2 text-sm">
+                <span className=" font-medium">Name:</span>
+                <span className="">{collectionToInfo?.name}</span>
+              </div>
+              <div className="grid grid-cols-[100px_1fr] gap-2 text-sm">
+                <span className=" font-medium">Path:</span>
+                <span className=" break-all">{collectionToInfo?.path}</span>
+              </div>
+              <div className="grid grid-cols-[100px_1fr] gap-2 text-sm">
+                <span className=" font-medium">Pattern:</span>
+                <span className=" font-mono">{collectionToInfo?.pattern}</span>
+              </div>
+              <div className="grid grid-cols-[100px_1fr] gap-2 text-sm">
+                <span className=" font-medium">Files:</span>
+                <span className="">
+                  {collectionToInfo?.name
+                    ? getFileCount(collectionToInfo.name)
+                    : 0}{' '}
+                  files indexed
+                </span>
+              </div>
+              {collectionToInfo?.update && (
+                <div className="grid grid-cols-[100px_1fr] gap-2 text-sm">
+                  <span className=" font-medium">Auto-update:</span>
+                  <span className="">{collectionToInfo.update}</span>
+                </div>
+              )}
+              {collectionToInfo?.context &&
+                Object.keys(collectionToInfo.context).length > 0 && (
+                  <div className="space-y-2">
+                    <span className=" font-medium text-sm">Context Paths:</span>
+                    <div>
+                      {Object.entries(collectionToInfo.context).map(
+                        ([path, desc]) => (
+                          <div key={path} className="text-xs">
+                            <span className=" font-mono">{path}</span>
+                            <span className=""> - {desc}</span>
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  </div>
+                )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setInfoDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
