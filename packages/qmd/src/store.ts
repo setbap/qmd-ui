@@ -15,25 +15,21 @@ import { Database } from "bun:sqlite";
 import { realpathSync } from "node:fs";
 import * as sqliteVec from "sqlite-vec";
 import {
-  LlamaCpp,
   getDefaultLlamaCpp,
   formatQueryForEmbedding,
   formatDocForEmbedding,
   type RerankDocument,
 } from "./llm";
 import {
-  findContextForPath as collectionsFindContextForPath,
   addContext as collectionsAddContext,
   removeContext as collectionsRemoveContext,
   listAllContexts as collectionsListAllContexts,
   getCollection,
   listCollections as collectionsListCollections,
-  addCollection as collectionsAddCollection,
   removeCollection as collectionsRemoveCollection,
   renameCollection as collectionsRenameCollection,
   setGlobalContext,
   loadConfig as collectionsLoadConfig,
-  type NamedCollection,
 } from "./collections";
 
 // =============================================================================

@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { RiFileTextLine } from '@remixicon/react'
 import { cn } from '@/lib/utils'
-import { Badge } from './ui/badge'
+import { Badge } from '@/components/ui/badge'
 
 export interface SearchResult {
   docid: string

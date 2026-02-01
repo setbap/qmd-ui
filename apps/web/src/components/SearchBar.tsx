@@ -4,7 +4,6 @@ import * as React from 'react'
 import {
   InputGroup,
   InputGroupAddon,
-  InputGroupButton,
   InputGroupInput,
   InputGroupText,
 } from '@/components/ui/input-group'
@@ -17,8 +16,8 @@ import {
 } from '@/components/ui/select'
 import { RiSearchLine, RiDatabase2Line } from '@remixicon/react'
 import { cn } from '@/lib/utils'
-import { Badge } from './ui/badge'
-import { Button } from './ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 
 type SearchMode = 'search' | 'vsearch' | 'query'
 

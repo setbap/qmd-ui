@@ -12,7 +12,6 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from '@/components/ui/command'
-import { cn } from '@/lib/utils'
 import {
   RiAddCircleLine,
   RiRefreshLine,
@@ -22,6 +21,7 @@ import {
   RiSparklingLine,
   RiDatabase2Line,
 } from '@remixicon/react'
+import { Kbd } from '@/components/ui/kbd'
 
 type CommandAction =
   | 'createCollection'
@@ -145,9 +145,7 @@ export function CommandPalette({
 
           {commandGroups.map((group, groupIndex) => (
             <React.Fragment key={group.heading}>
-              {groupIndex > 0 && (
-                <CommandSeparator className="bg-amber-900/30" />
-              )}
+              {groupIndex > 0 && <CommandSeparator />}
               <CommandGroup heading={group.heading}>
                 {group.commands.map((command) => (
                   <CommandItem
@@ -157,10 +155,8 @@ export function CommandPalette({
                     {command.icon}
                     <span>{command.label}</span>
                     {command.shortcut && (
-                      <CommandShortcut className="">
-                        <kbd className="rounded border border-amber-800 bg-amber-950 px-1.5 py-0.5 font-mono text-xs">
-                          {command.shortcut}
-                        </kbd>
+                      <CommandShortcut>
+                        <Kbd>{command.shortcut}</Kbd>
                       </CommandShortcut>
                     )}
                   </CommandItem>
