@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@qmd/core": "workspace:*",
+    "@qmd/utility": "workspace:*",
     "@qmd/formatter": "workspace:*",
     "@base-ui/react": "^1.1.0",
     "@fontsource-variable/noto-sans": "^5.2.10",

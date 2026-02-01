@@ -23,6 +23,7 @@ import {
   type SearchResult,
   type RankedResult,
 } from '@qmd/core'
+import { fetchDocument } from '@qmd/utility'
 
 // Enable production mode for QMD
 import { execSync } from 'child_process'
@@ -79,19 +80,8 @@ export const getCollectionFiles = createServerFn()
   .handler(async ({ data }) => {
     const { name } = data
     if (!name) throw new Error('Collection name required')
-
-    try {
-      console.clear()
-      console.log('gooo')
-      const store = await getStore()
-      const d = getActiveDocumentPaths(store.db, name)
-      console.log({ d })
-
-      return d
-    } catch (error) {
-      console.log(error)
-      return []
-    }
+    const store = await getStore()
+    getActiveDocumentPaths(store.db, name)
   })
 
 export const createCollection = createServerFn().handler(async (ctx) => {
@@ -427,6 +417,46 @@ export const getFileContent = createServerFn().handler(async (ctx) => {
     title: result.title,
   } as FileContent
 })
+
+/**
+ * Get document content by collection name and file path
+ * Mimics CLI `qmd get qmd://<collection>/<filename>` behavior
+ */
+export interface DocumentContent {
+  content: string
+  filepath: string
+  displayPath: string
+  title: string
+  collectionName: string
+  context: string | null
+}
+
+export const getDocumentByCollection = createServerFn()
+  .inputValidator((data: { collectionName: string; path: string }) => data)
+  .handler(async ({ data }) => {
+    const { collectionName, path } = data
+
+    if (!collectionName || !path) {
+      throw new Error('Collection name and file path are required')
+    }
+
+    const store = await getStore()
+
+    // Build virtual path like qmd://collection/path
+    const virtualPath = `qmd://${collectionName}/${path}`
+
+    // Use the fetchDocument function from CLI for consistent behavior
+    const result = fetchDocument(store.db, virtualPath)
+
+    return {
+      content: result.content,
+      filepath: result.filepath,
+      displayPath: result.virtualPath,
+      title: result.filepath.split('/').pop() || result.filepath,
+      collectionName: result.collectionName,
+      context: result.context,
+    } as DocumentContent
+  })
 
 // =============================================================================
 // Settings Operations

@@ -14,6 +14,7 @@
     "@opentui/core": "^0.1.75",
     "@opentui/solid": "^0.1.75",
     "@qmd/core": "workspace:*",
+    "@qmd/utility": "workspace:*",
     "@qmd/formatter": "workspace:*",
     "@babel/core": "^7.28.5",
     "@babel/preset-typescript": "^7.28.5",

@@ -83,6 +83,7 @@ interface CollectionPanelProps {
   onRenameCollection: (oldName: string, newName: string) => Promise<void>
   onCreateCollection: () => void
   getCollectionFiles: (name: string) => Promise<FileInfo[]>
+  onFileClick?: (path: string, collectionName: string) => void
   isLoading?: boolean
   error?: Error | null
 }
@@ -98,10 +99,10 @@ export function CollectionPanel({
   onRenameCollection,
   onCreateCollection,
   getCollectionFiles,
+  onFileClick,
   isLoading = false,
   error = null,
 }: CollectionPanelProps) {
-  // State for rename dialog
   const [renameDialogOpen, setRenameDialogOpen] = useState(false)
   const [collectionToRename, setCollectionToRename] = useState<string | null>(
     null,
@@ -491,6 +492,7 @@ export function CollectionPanel({
                                       <SidebarMenuSubButton
                                         className=" hover:bg-amber-900/20 cursor-pointer"
                                         title={file.path}
+                                        onClick={() => onFileClick?.(file.path, collection.name)}
                                       >
                                         <RiFileTextLine className="h-3 w-3 shrink-0 " />
                                         <span className="truncate text-xs">

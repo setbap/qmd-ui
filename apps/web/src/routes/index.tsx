@@ -14,7 +14,7 @@ import { useFileContent } from '@/hooks/useFileContent'
 import { useSettings } from '@/hooks/useSettings'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
-import { embedCollection } from '@/lib/server/qmd'
+import { embedCollection, getDocumentByCollection } from '@/lib/server/qmd'
 import type { SearchResult } from '@/components/SearchResults'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
@@ -167,6 +167,23 @@ function HomeComponent() {
             }}
             onCreateCollection={() => setIsCreateDialogOpen(true)}
             getCollectionFiles={collections.fetchCollectionFiles}
+            onFileClick={async (path, collectionName) => {
+              try {
+                const result = await getDocumentByCollection({
+                  data: {
+                    collectionName,
+                    path,
+                  },
+                })
+                console.log('File content loaded:', result)
+                // Show the content in a modal or use it as needed
+                setViewingFile(path)
+                setViewingCollection(collectionName)
+              } catch (err) {
+                console.error('Failed to load file:', err)
+                toast.error(`Failed to load file: ${path}`)
+              }
+            }}
           />
         }
       >
