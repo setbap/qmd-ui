@@ -13,7 +13,11 @@ import { useAppSearch } from '@/hooks/useSearch'
 import { useSettings } from '@/hooks/useSettings'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
-import { embedCollection, getDocumentByCollection } from '@/lib/server/qmd'
+import {
+  embedCollection,
+  getDocumentByCollection,
+  type SearchMode,
+} from '@/lib/server/qmd'
 import type { SearchResult } from '@/components/SearchResults'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
@@ -38,6 +42,9 @@ interface SelectedFile {
 // URL search params type
 interface HomeSearchParams {
   file?: string
+  q?: string
+  m?: string
+  c?: string
 }
 
 function HomeComponent() {
@@ -100,6 +107,48 @@ function HomeComponent() {
     loadFileFromUrl()
   }, [searchParams, navigate])
 
+  // Execute search from URL on page load (if query param exists)
+  useEffect(() => {
+    const queryFromUrl = searchParams.q
+    if (queryFromUrl && queryFromUrl.trim()) {
+      // Execute search with params from URL
+      search.executeSearch({
+        query: queryFromUrl,
+        mode: (searchParams.m as SearchMode) || 'query',
+        collection: searchParams.c || null,
+      })
+    }
+    // Only run on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Keyboard shortcuts: Ctrl+K for Command Palette, / for Search focus
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+K or Cmd+K: Open Command Palette
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        setIsCommandPaletteOpen(true)
+      }
+      // / key: Focus search input (when not in an input field)
+      if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const target = e.target as HTMLElement
+        // Don't trigger if user is typing in an input, textarea, or contenteditable element
+        if (
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable
+        ) {
+          return
+        }
+        e.preventDefault()
+        document.getElementById('search-input')?.focus()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
   // Command palette actions
   const handleCommandAction = useCallback(
     async (
@@ -120,7 +169,12 @@ function HomeComponent() {
         case 'vsearch':
         case 'query':
           // Set search mode and focus search input
-          search.setMode(action)
+          // search.setMode(action)
+          search.executeSearch({
+            mode: action,
+            collection: search.collection,
+            query: search.query,
+          })
           break
         case 'createCollection':
           setIsCreateDialogOpen(true)
@@ -365,7 +419,6 @@ function HomeComponent() {
             onChange={search.setQuery}
             onSubmit={search.executeSearch}
             mode={search.mode}
-            onModeChange={search.setMode}
             selectedCollection={search.collection}
           />
         </div>

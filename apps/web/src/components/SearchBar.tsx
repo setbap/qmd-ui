@@ -24,9 +24,12 @@ type SearchMode = 'search' | 'vsearch' | 'query'
 interface SearchBarProps {
   value: string
   onChange: (value: string) => void
-  onSubmit: () => void
+  onSubmit: (params?: {
+    query?: string
+    mode?: SearchMode
+    collection?: string | null
+  }) => void
   mode: SearchMode
-  onModeChange: (mode: SearchMode) => void
   selectedCollection: string | null
   placeholder?: string
   disabled?: boolean
@@ -47,15 +50,31 @@ export function SearchBar({
   onChange,
   onSubmit,
   mode,
-  onModeChange,
   selectedCollection,
-  placeholder = 'Search your documents...',
+  placeholder = 'Search your documents... ( Press / to focus and Enter to search )',
   disabled = false,
 }: SearchBarProps) {
+  const [localValue, setLocalValue] = React.useState(value)
+
+  // Sync local value with prop value when it changes externally
+  React.useEffect(() => {
+    setLocalValue(value)
+  }, [value])
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      onSubmit()
+      onChange(localValue)
+      onSubmit({
+        query: localValue,
+      })
     }
+  }
+
+  const handleSubmit = () => {
+    onChange(localValue)
+    onSubmit({
+      query: localValue,
+    })
   }
 
   const currentMode = searchModeOptions.find((o) => o.value === mode)
@@ -72,8 +91,9 @@ export function SearchBar({
       <div className="px-4 py-4">
         <InputGroup className="h-auto bg-background shadow-2xl min-h-18 rounded-xl">
           <InputGroupInput
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
+            id="search-input"
+            value={localValue}
+            onChange={(e) => setLocalValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
             disabled={disabled}
@@ -87,7 +107,13 @@ export function SearchBar({
                 {/* Mode Selector */}
                 <Select
                   value={mode}
-                  onValueChange={(v) => onModeChange(v as SearchMode)}
+                  onValueChange={(v) => {
+                    onSubmit({
+                      mode: v as SearchMode,
+                      collection: selectedCollection,
+                      query: localValue,
+                    })
+                  }}
                   disabled={disabled}
                 >
                   <SelectTrigger
@@ -121,7 +147,11 @@ export function SearchBar({
               </div>
             </div>
 
-            <Button onClick={onSubmit} disabled={disabled} variant={'default'}>
+            <Button
+              onClick={handleSubmit}
+              disabled={disabled}
+              variant={'default'}
+            >
               <RiSearchLine className="h-4 w-4" />
             </Button>
           </InputGroupAddon>

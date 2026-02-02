@@ -77,7 +77,7 @@ export function useAppSearch(): UseAppSearchReturn {
     [query, mode, collection, navigate, searchParams],
   )
 
-  // Search query
+  // Search query - disabled auto-search, only manual via executeSearch
   const searchQuery = useQuery({
     queryKey: [SEARCH_KEY, query, mode, collection],
     queryFn: async (): Promise<SearchResult[]> => {
@@ -92,7 +92,7 @@ export function useAppSearch(): UseAppSearchReturn {
       } as any)
       return result as SearchResult[]
     },
-    enabled: !!query.trim(),
+    enabled: false, // Disable auto-search - only execute on Enter/button click
     staleTime: 1000 * 60, // 1 minute
   })
 
@@ -103,14 +103,24 @@ export function useAppSearch(): UseAppSearchReturn {
       mode?: SearchMode
       collection?: string | null
     }) => {
+      // Update state with provided params first (so queryKey is correct)
+      const newQuery = params?.query ?? query
+      
+      if (params?.query !== undefined) setQuery(params.query)
+      if (params?.mode !== undefined) setMode(params.mode)
+      if (params?.collection !== undefined) setCollection(params.collection)
+      
       updateUrl(params)
-      // Refetch with current state (queryKey will have latest values after state updates)
-      const searchQuery_val = params?.query ?? query
-      if (searchQuery_val.trim()) {
-        searchQuery.refetch()
+      
+      // Refetch with the new values (query will run with updated state on next tick)
+      if (newQuery.trim()) {
+        // Use a small timeout to ensure state updates have propagated
+        setTimeout(() => {
+          searchQuery.refetch()
+        }, 0)
       }
     },
-    [updateUrl, searchQuery, query],
+    [updateUrl, searchQuery, query, mode, collection],
   )
 
   // Cycle through search modes
