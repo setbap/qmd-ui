@@ -27,7 +27,6 @@ import {
   SidebarMenuSubItem,
   SidebarGroup,
   SidebarGroupLabel,
-  SidebarSeparator,
   SidebarFooter,
 } from '@/components/ui/sidebar'
 import {
@@ -84,6 +83,7 @@ interface CollectionPanelProps {
   onCreateCollection: () => void
   getCollectionFiles: (name: string) => Promise<FileInfo[]>
   onFileClick?: (path: string, collectionName: string) => void
+  selectedFilePath?: string | null
   isLoading?: boolean
   error?: Error | null
 }
@@ -100,6 +100,7 @@ export function CollectionPanel({
   onCreateCollection,
   getCollectionFiles,
   onFileClick,
+  selectedFilePath = null,
   isLoading = false,
   error = null,
 }: CollectionPanelProps) {
@@ -485,24 +486,50 @@ export function CollectionPanel({
                             ) : (
                               <ScrollArea className="max-h-48">
                                 <div className="space-y-0.5">
-                                  {files.map((file, idx) => (
-                                    <SidebarMenuSubItem
-                                      key={`${file.path}-${idx}`}
-                                    >
-                                      <SidebarMenuSubButton
-                                        className=" hover:bg-amber-900/20 cursor-pointer"
-                                        title={file.path}
-                                        onClick={() => onFileClick?.(file.path, collection.name)}
+                                  {files.map((file, idx) => {
+                                    const fileFullPath = `qmd://${collection.name}/${file.path}`
+                                    const isActive =
+                                      selectedFilePath === fileFullPath
+                                    return (
+                                      <SidebarMenuSubItem
+                                        key={`${file.path}-${idx}`}
                                       >
-                                        <RiFileTextLine className="h-3 w-3 shrink-0 " />
-                                        <span className="truncate text-xs">
-                                          {file.title ||
-                                            file.path.split('/').pop() ||
-                                            file.path}
-                                        </span>
-                                      </SidebarMenuSubButton>
-                                    </SidebarMenuSubItem>
-                                  ))}
+                                        <SidebarMenuSubButton
+                                          className={cn(
+                                            'cursor-pointer',
+                                            isActive
+                                              ? 'bg-amber-500 text-amber-50'
+                                              : 'hover:bg-amber-600',
+                                          )}
+                                          title={file.path}
+                                          onClick={() =>
+                                            onFileClick?.(
+                                              file.path,
+                                              collection.name,
+                                            )
+                                          }
+                                        >
+                                          <RiFileTextLine
+                                            className={cn(
+                                              'h-3 w-3 shrink-0',
+                                              isActive && 'text-amber-500',
+                                            )}
+                                          />
+                                          <span
+                                            className={cn(
+                                              'truncate text-xs',
+                                              isActive &&
+                                                'text-amber-50 font-medium',
+                                            )}
+                                          >
+                                            {file.title ||
+                                              file.path.split('/').pop() ||
+                                              file.path}
+                                          </span>
+                                        </SidebarMenuSubButton>
+                                      </SidebarMenuSubItem>
+                                    )
+                                  })}
                                 </div>
                               </ScrollArea>
                             )}

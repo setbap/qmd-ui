@@ -1,17 +1,15 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { useState, useCallback } from 'react'
+import { createFileRoute, useSearch, useNavigate } from '@tanstack/react-router'
+import { useState, useCallback, useEffect } from 'react'
 import { Layout } from '@/components/Layout'
 import { SearchBar } from '@/components/SearchBar'
 import { CollectionPanel } from '@/components/CollectionPanel'
 import { SearchResults } from '@/components/SearchResults'
 import { CommandPalette } from '@/components/CommandPalette'
-import { FileViewer } from '@/components/FileViewer'
 import { FileContentPanel } from '@/components/FileContentPanel'
 import { CreateCollectionDialog } from '@/components/CreateCollectionDialog'
 import { SettingsDialog, type Settings } from '@/components/SettingsDialog'
 import { useCollections } from '@/hooks/useCollections'
 import { useAppSearch } from '@/hooks/useSearch'
-import { useFileContent } from '@/hooks/useFileContent'
 import { useSettings } from '@/hooks/useSettings'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
@@ -36,24 +34,70 @@ interface SelectedFile {
   content: string
 }
 
+// URL search params type
+interface HomeSearchParams {
+  file?: string
+}
+
 function HomeComponent() {
   // Hooks
   const collections = useCollections()
   const search = useAppSearch()
   const settings = useSettings()
+  const navigate = useNavigate({ from: Route.fullPath })
+  const searchParams = useSearch({ from: Route.fullPath }) as HomeSearchParams
 
   // Modal states
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [viewingFile, setViewingFile] = useState<string | null>(null)
-  const [viewingCollection, setViewingCollection] = useState<string | null>(
-    null,
-  )
   const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null)
 
-  // File content query
-  const fileContent = useFileContent(viewingFile, viewingCollection)
+  // Load file from URL on mount
+  useEffect(() => {
+    const loadFileFromUrl = async () => {
+      const fileParam = searchParams.file
+      if (!fileParam) return
+
+      // Parse qmd://collection/path format
+      const match = fileParam.match(/^qmd:\/\/([^/]+)\/(.+)$/)
+      if (!match) {
+        console.error('Invalid file param format:', fileParam)
+        return
+      }
+
+      const collectionName = match[1]
+      const filePath = match[2]
+
+      if (!collectionName || !filePath) {
+        console.error('Invalid file param format:', fileParam)
+        return
+      }
+
+      try {
+        const result = await getDocumentByCollection({
+          data: {
+            collectionName,
+            path: filePath,
+          },
+        })
+        setSelectedFile({
+          path: filePath,
+          collectionName,
+          title: result.title || filePath.split('/').pop() || filePath,
+          content: result.content,
+        })
+      } catch (err) {
+        console.error('Failed to load file from URL:', err)
+        toast.error(`Failed to load file: ${filePath}`)
+        // Clear invalid file param while preserving other params
+        const { file, ...restParams } = searchParams
+        navigate({ search: restParams })
+      }
+    }
+
+    loadFileFromUrl()
+  }, [searchParams, navigate])
 
   // Command palette actions
   const handleCommandAction = useCallback(
@@ -121,10 +165,44 @@ function HomeComponent() {
 
   // Handle result selection
   const handleSelectResult = useCallback((result: SearchResult) => {
-    const path = result.filepath.replace(/^qmd:\/\/[^/]+\//, '')
-    setViewingFile(path)
-    setViewingCollection(result.collectionName)
+    // Don't set selectedFile here - just let the user click if they want to view
+    console.log('Selected result:', result)
   }, [])
+
+  // Handle file click from CollectionPanel - updates URL
+  const handleFileClick = useCallback(
+    async (path: string, collectionName: string) => {
+      try {
+        const result = await getDocumentByCollection({
+          data: {
+            collectionName,
+            path,
+          },
+        })
+        // Show content in the split panel
+        setSelectedFile({
+          path,
+          collectionName,
+          title: result.title || path.split('/').pop() || path,
+          content: result.content,
+        })
+        // Update URL with file param while preserving other query params
+        const fileParam = `qmd://${collectionName}/${path}`
+        navigate({ search: { ...searchParams, file: fileParam } })
+      } catch (err) {
+        console.error('Failed to load file:', err)
+        toast.error(`Failed to load file: ${path}`)
+      }
+    },
+    [navigate, searchParams],
+  )
+
+  // Handle closing file viewer - clears only file param from URL
+  const handleCloseFile = useCallback(() => {
+    setSelectedFile(null)
+    const { file, ...restParams } = searchParams
+    navigate({ search: restParams })
+  }, [navigate, searchParams])
 
   // Convert AppSettings to Settings for the dialog
   const dialogSettings: Settings = {
@@ -133,6 +211,11 @@ function HomeComponent() {
     outputFormat:
       (settings.settings.outputFormat as Settings['outputFormat']) ?? 'cli',
   }
+
+  // Get selected file path for CollectionPanel highlighting
+  const selectedFilePath = selectedFile
+    ? `qmd://${selectedFile.collectionName}/${selectedFile.path}`
+    : null
 
   return (
     <>
@@ -181,30 +264,8 @@ function HomeComponent() {
             }}
             onCreateCollection={() => setIsCreateDialogOpen(true)}
             getCollectionFiles={collections.fetchCollectionFiles}
-            onFileClick={async (path, collectionName) => {
-              try {
-                const result = await getDocumentByCollection({
-                  data: {
-                    collectionName,
-                    path,
-                  },
-                })
-                console.log('File content loaded:', result)
-                // Show content in the split panel
-                setSelectedFile({
-                  path,
-                  collectionName,
-                  title: result.title || path.split('/').pop() || path,
-                  content: result.content,
-                })
-                // Also update viewing state for modal fallback
-                setViewingFile(path)
-                setViewingCollection(collectionName)
-              } catch (err) {
-                console.error('Failed to load file:', err)
-                toast.error(`Failed to load file: ${path}`)
-              }
-            }}
+            onFileClick={handleFileClick}
+            selectedFilePath={selectedFilePath}
           />
         }
       >
@@ -235,7 +296,7 @@ function HomeComponent() {
                   title={selectedFile.title}
                   content={selectedFile.content}
                   path={`qmd://${selectedFile.collectionName}/${selectedFile.path}`}
-                  onClose={() => setSelectedFile(null)}
+                  onClose={handleCloseFile}
                 />
               </ResizablePanel>
             </ResizablePanelGroup>
@@ -298,19 +359,6 @@ function HomeComponent() {
             toast.error('Failed to update settings')
           }
         }}
-      />
-
-      <FileViewer
-        open={!!viewingFile}
-        onOpenChange={(open) => {
-          if (!open) {
-            setViewingFile(null)
-            setViewingCollection(null)
-          }
-        }}
-        content={fileContent.data?.content ?? ''}
-        title={fileContent.data?.title ?? viewingFile ?? ''}
-        path={fileContent.data?.filepath ?? ''}
       />
 
       <Toaster theme="dark" position="bottom-right" />

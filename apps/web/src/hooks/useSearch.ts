@@ -44,7 +44,7 @@ export function useAppSearch(): UseAppSearchReturn {
     (searchParams as Record<string, string | undefined>).c ?? null,
   )
 
-  // Update URL with given params
+  // Update URL with given params (preserves existing params like 'file')
   const updateUrl = useCallback(
     (
       params: {
@@ -53,21 +53,28 @@ export function useAppSearch(): UseAppSearchReturn {
         collection?: string | null
       } = {},
     ) => {
-      const searchParams: Record<string, string> = {}
+      const currentParams = searchParams as Record<string, string | undefined>
+      const searchParamsToSet: Record<string, string> = {}
+      
+      // Preserve existing file param if present
+      if (currentParams.file) {
+        searchParamsToSet.file = currentParams.file
+      }
+      
       const q = params.query ?? query
       const m = params.mode ?? mode
       const c = params.collection !== undefined ? params.collection : collection
 
-      if (q) searchParams.q = q
-      if (m !== 'query') searchParams.m = m
-      if (c) searchParams.c = c
+      if (q) searchParamsToSet.q = q
+      if (m !== 'query') searchParamsToSet.m = m
+      if (c) searchParamsToSet.c = c
       navigate({
         to: '/',
-        search: searchParams,
+        search: searchParamsToSet,
         replace: true,
       })
     },
-    [query, mode, collection, navigate],
+    [query, mode, collection, navigate, searchParams],
   )
 
   // Search query
