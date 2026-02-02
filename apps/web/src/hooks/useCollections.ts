@@ -50,8 +50,6 @@ export function useCollections() {
     async (
       collectionName: string,
     ): Promise<Array<{ path: string; title?: string }>> => {
-      console.clear()
-      console.log(collectionName)
       const result = await getCollectionFiles({
         data: { name: collectionName },
       })

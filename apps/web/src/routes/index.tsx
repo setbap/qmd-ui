@@ -32,6 +32,7 @@ interface SelectedFile {
   collectionName: string
   title: string
   content: string
+  lineNumber?: number
 }
 
 // URL search params type
@@ -163,11 +164,56 @@ function HomeComponent() {
     [search],
   )
 
-  // Handle result selection
-  const handleSelectResult = useCallback((result: SearchResult) => {
-    // Don't set selectedFile here - just let the user click if they want to view
-    console.log('Selected result:', result)
-  }, [])
+  // Handle result selection - opens file in panel like collection file click
+  const handleSelectResult = useCallback(
+    async (result: SearchResult) => {
+      try {
+        // Parse filepath: qmd://collection/path[:lineNumber]
+        const filepathMatch = result.filepath.match(/^qmd:\/\/([^/]+)\/(.+)$/)
+        if (!filepathMatch || !filepathMatch[1] || !filepathMatch[2]) {
+          throw new Error(`Invalid filepath format: ${result.filepath}`)
+        }
+
+        let extractedCollectionName = filepathMatch[1]
+        let path = filepathMatch[2]
+        let lineNumber: number | undefined
+
+        // Extract line number from path if present (e.g., "path:23")
+        const lineMatch = path.match(/:(\d+)$/)
+        if (lineMatch && lineMatch[1]) {
+          lineNumber = parseInt(lineMatch[1], 10)
+          path = path.replace(/:\d+$/, '')
+        }
+
+        const collectionName = result.collectionName || extractedCollectionName
+
+        const result_data = await getDocumentByCollection({
+          data: {
+            collectionName,
+            path,
+          },
+        })
+        console.clear()
+        console.log({ result_data })
+        // Show content in the split panel
+        setSelectedFile({
+          path,
+          collectionName,
+          title:
+            result_data.title || result.title || path.split('/').pop() || path,
+          content: result_data.content,
+          lineNumber,
+        })
+        // Update URL with file param while preserving other query params
+        const fileParam = `qmd://${collectionName}/${path}`
+        navigate({ search: { ...searchParams, file: fileParam } })
+      } catch (err) {
+        console.error('Failed to load file:', err)
+        toast.error(`Failed to load file: ${result.filepath}`)
+      }
+    },
+    [navigate, searchParams],
+  )
 
   // Handle file click from CollectionPanel - updates URL
   const handleFileClick = useCallback(
@@ -220,13 +266,15 @@ function HomeComponent() {
   return (
     <>
       <Layout
+        logo={<h1>QMD for Web</h1>}
         commandPalette={
           <Button
             size={'lg'}
             variant={'outline'}
+            className={'w-64 justify-between'}
             onClick={() => setIsCommandPaletteOpen(true)}
           >
-            <span>Search commands...</span>
+            <span>Search For commands...</span>
             <Kbd>⌘K</Kbd>
           </Button>
         }
@@ -289,13 +337,14 @@ function HomeComponent() {
               <ResizableHandle withHandle />
               <ResizablePanel
                 defaultSize={50}
-                minSize={30}
+                minSize={'200px'}
                 className="h-full overflow-hidden"
               >
                 <FileContentPanel
                   title={selectedFile.title}
                   content={selectedFile.content}
                   path={`qmd://${selectedFile.collectionName}/${selectedFile.path}`}
+                  lineNumber={selectedFile.lineNumber}
                   onClose={handleCloseFile}
                 />
               </ResizablePanel>

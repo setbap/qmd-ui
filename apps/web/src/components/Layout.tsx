@@ -6,20 +6,26 @@ import {
 } from '@/components/ui/sidebar'
 interface LayoutProps {
   children: ReactNode
+  logo: ReactNode
   commandPalette: ReactNode
   sideBar: ReactNode
 }
 
-export function Layout({ children, commandPalette, sideBar }: LayoutProps) {
+export function Layout({
+  logo,
+  children,
+  commandPalette,
+  sideBar,
+}: LayoutProps) {
   return (
     <SidebarProvider>
       <SidebarInset>
         <header className="z-10 bg-background flex h-12 shrink-0 items-center gap-2 border-b px-4">
-          <div className="flex-1 flex items-center justify-center">
-            {commandPalette}
+          <div className="flex-1 w-full flex items-center justify-between">
+            <div>{logo}</div>
+            <div>{commandPalette}</div>
+            <SidebarTrigger className="rotate-180" />
           </div>
-
-          <SidebarTrigger className="mr-1 ml-auto rotate-180" />
         </header>
         <div className="flex h-[calc(100vh-4rem)] flex-col gap-4">
           <div className="flex overflow-hidden">{children}</div>

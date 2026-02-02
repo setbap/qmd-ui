@@ -130,7 +130,6 @@ export function CollectionPanel({
   >({})
   const [loadingFiles, setLoadingFiles] = useState<Record<string, boolean>>({})
 
-  // Fetch files when collection is expanded
   const handleToggleExpand = useCallback(
     async (collectionName: string) => {
       const isExpanding = !expandedCollections.has(collectionName)
@@ -313,7 +312,7 @@ export function CollectionPanel({
               {collections.length}{' '}
               {collections.length === 1 ? 'Collection' : 'Collections'}
             </SidebarGroupLabel>
-            <SidebarMenu className="space-y-2">
+            <SidebarMenu className="space-y-1">
               {/* All Collections Option */}
               <SidebarMenuItem>
                 <SidebarMenuButton
@@ -323,8 +322,8 @@ export function CollectionPanel({
                   className={cn(
                     'group/menu-button',
                     selectedCollection === null
-                      ? 'bg-amber-500/10 '
-                      : ' hover:bg-amber-900/30 hover:',
+                      ? 'bg-amber-500/80 '
+                      : ' hover:bg-amber-900/60 hover:',
                   )}
                 >
                   <RiDatabase2Line className="h-4 w-4 shrink-0  group-data-[active=true]/menu-button:" />
@@ -498,7 +497,7 @@ export function CollectionPanel({
                                           className={cn(
                                             'cursor-pointer',
                                             isActive
-                                              ? 'bg-amber-500 text-amber-50'
+                                              ? 'bg-amber-500 text-black'
                                               : 'hover:bg-amber-600',
                                           )}
                                           title={file.path}
@@ -511,8 +510,9 @@ export function CollectionPanel({
                                         >
                                           <RiFileTextLine
                                             className={cn(
+                                              'text-neutral-700!',
                                               'h-3 w-3 shrink-0',
-                                              isActive && 'text-amber-500',
+                                              isActive && 'text-white!',
                                             )}
                                           />
                                           <span
