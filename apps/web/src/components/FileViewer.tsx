@@ -65,7 +65,7 @@ export function FileViewer({
           <div className="p-4">
             <pre
               className={cn(
-                'whitespace-pre-wrap break-words font-mono text-sm leading-relaxed',
+                'whitespace-pre-wrap wrap-break-word font-mono text-sm leading-relaxed',
                 '',
               )}
             >

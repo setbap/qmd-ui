@@ -6,7 +6,17 @@
  * LLM operations use LlamaCpp with local GGUF models (node-llama-cpp).
  */
 
-import { describe, test, expect, beforeAll, afterAll, beforeEach, afterEach, mock, spyOn } from "bun:test";
+import {
+  describe,
+  test,
+  expect,
+  beforeAll,
+  afterAll,
+  beforeEach,
+  afterEach,
+  mock,
+  spyOn,
+} from "bun:test";
 import { Database } from "bun:sqlite";
 import { unlink, mkdtemp, rmdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -58,10 +68,16 @@ let testDbPath: string;
 let testConfigDir: string;
 
 async function createTestStore(): Promise<Store> {
-  testDbPath = join(testDir, `test-${Date.now()}-${Math.random().toString(36).slice(2)}.sqlite`);
+  testDbPath = join(
+    testDir,
+    `test-${Date.now()}-${Math.random().toString(36).slice(2)}.sqlite`,
+  );
 
   // Set up test config directory
-  const configPrefix = join(testDir, `config-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const configPrefix = join(
+    testDir,
+    `config-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+  );
   testConfigDir = await mkdtemp(configPrefix);
 
   // Set environment variable to use test config
@@ -71,7 +87,7 @@ async function createTestStore(): Promise<Store> {
   const emptyConfig: CollectionConfig = { collections: {} };
   await writeFile(
     join(testConfigDir, "index.yml"),
-    YAML.stringify(emptyConfig)
+    YAML.stringify(emptyConfig),
   );
 
   return createStore(testDbPath);
@@ -87,7 +103,11 @@ async function cleanupTestDb(store: Store): Promise<void> {
 
   // Clean up test config directory
   try {
-    const { readdir, unlink: unlinkFile, rmdir: rmdirAsync } = await import("node:fs/promises");
+    const {
+      readdir,
+      unlink: unlinkFile,
+      rmdir: rmdirAsync,
+    } = await import("node:fs/promises");
     const files = await readdir(testConfigDir);
     for (const file of files) {
       await unlinkFile(join(testConfigDir, file));
@@ -113,7 +133,7 @@ async function insertTestDocument(
     filepath?: string;
     body?: string;
     active?: number;
-  }
+  },
 ): Promise<number> {
   const now = new Date().toISOString();
   const name = opts.name || "test-doc";
@@ -126,7 +146,7 @@ async function insertTestDocument(
   } else if (opts.filepath) {
     // Extract relative path from filepath by removing collection path
     // For tests, assume filepath is either relative or we want the whole path as the document path
-    path = opts.filepath.startsWith('/') ? opts.filepath : opts.filepath;
+    path = opts.filepath.startsWith("/") ? opts.filepath : opts.filepath;
   } else {
     path = `test/${name}.md`;
   }
@@ -135,30 +155,36 @@ async function insertTestDocument(
   const active = opts.active ?? 1;
 
   // Generate hash from body if not provided
-  const hash = opts.hash || await hashContent(body);
+  const hash = opts.hash || (await hashContent(body));
 
   // Insert content (with OR IGNORE for deduplication)
-  db.prepare(`
+  db.prepare(
+    `
     INSERT OR IGNORE INTO content (hash, doc, created_at)
     VALUES (?, ?, ?)
-  `).run(hash, body, now);
+  `,
+  ).run(hash, body, now);
 
   // Insert document
-  const result = db.prepare(`
+  const result = db
+    .prepare(
+      `
     INSERT INTO documents (collection, path, title, hash, created_at, modified_at, active)
     VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(collectionName, path, title, hash, now, now, active);
+  `,
+    )
+    .run(collectionName, path, title, hash, now, now, active);
 
   return Number(result.lastInsertRowid);
 }
 
 // Helper to create a test collection in YAML config
 async function createTestCollection(
-  options: { pwd?: string; glob?: string; name?: string } = {}
+  options: { pwd?: string; glob?: string; name?: string } = {},
 ): Promise<string> {
   const pwd = options.pwd || "/test/collection";
   const glob = options.glob || "**/*.md";
-  const name = options.name || pwd.split('/').filter(Boolean).pop() || 'test';
+  const name = options.name || pwd.split("/").filter(Boolean).pop() || "test";
 
   // Read current config
   const configPath = join(testConfigDir, "index.yml");
@@ -178,7 +204,11 @@ async function createTestCollection(
 }
 
 // Helper to add path context in YAML config
-async function addPathContext(collectionName: string, pathPrefix: string, contextText: string): Promise<void> {
+async function addPathContext(
+  collectionName: string,
+  pathPrefix: string,
+  contextText: string,
+): Promise<void> {
   // Read current config
   const configPath = join(testConfigDir, "index.yml");
   const { readFile } = await import("node:fs/promises");
@@ -340,15 +370,20 @@ describe("handelize", () => {
 
   test("converts triple underscore to folder separator", () => {
     expect(handelize("foo___bar.md")).toBe("foo/bar.md");
-    expect(handelize("notes___2025___january.md")).toBe("notes/2025/january.md");
+    expect(handelize("notes___2025___january.md")).toBe(
+      "notes/2025/january.md",
+    );
     expect(handelize("a/b___c/d.md")).toBe("a/b/c/d.md");
   });
 
   test("handles complex real-world meeting notes", () => {
     // Example: "Money Movement Licensing Review - 2025／11／19 10:25 EST - Notes by Gemini.md"
-    const complexName = "Money Movement Licensing Review - 2025／11／19 10:25 EST - Notes by Gemini.md";
+    const complexName =
+      "Money Movement Licensing Review - 2025／11／19 10:25 EST - Notes by Gemini.md";
     const result = handelize(complexName);
-    expect(result).toBe("money-movement-licensing-review-2025-11-19-10-25-est-notes-by-gemini.md");
+    expect(result).toBe(
+      "money-movement-licensing-review-2025-11-19-10-25-est-notes-by-gemini.md",
+    );
     expect(result).not.toContain(" ");
     expect(result).not.toContain("／");
     expect(result).not.toContain(":");
@@ -372,7 +407,9 @@ describe("handelize", () => {
 
   test("handles special project naming patterns", () => {
     expect(handelize("PROJECT_ABC_v2.0.md")).toBe("project-abc-v2-0.md");
-    expect(handelize("[WIP] Feature Request.md")).toBe("wip-feature-request.md");
+    expect(handelize("[WIP] Feature Request.md")).toBe(
+      "wip-feature-request.md",
+    );
     expect(handelize("(DRAFT) Proposal v1.md")).toBe("draft-proposal-v1.md");
   });
 
@@ -424,11 +461,15 @@ describe("Store Creation", () => {
     const store = await createTestStore();
 
     // Check tables exist
-    const tables = store.db.prepare(`
+    const tables = store.db
+      .prepare(
+        `
       SELECT name FROM sqlite_master WHERE type='table' ORDER BY name
-    `).all() as { name: string }[];
+    `,
+      )
+      .all() as { name: string }[];
 
-    const tableNames = tables.map(t => t.name);
+    const tableNames = tables.map((t) => t.name);
     expect(tableNames).toContain("documents");
     expect(tableNames).toContain("documents_fts");
     expect(tableNames).toContain("content_vectors");
@@ -440,7 +481,9 @@ describe("Store Creation", () => {
 
   test("createStore sets WAL journal mode", async () => {
     const store = await createTestStore();
-    const result = store.db.prepare("PRAGMA journal_mode").get() as { journal_mode: string };
+    const result = store.db.prepare("PRAGMA journal_mode").get() as {
+      journal_mode: string;
+    };
     expect(result.journal_mode).toBe("wal");
     await cleanupTestDb(store);
   });
@@ -551,7 +594,7 @@ describe("Document Chunking", () => {
 
   test("chunkDocument with overlap creates overlapping chunks", () => {
     const content = "A".repeat(3000);
-    const chunks = chunkDocument(content, 1000, 150);  // 15% overlap
+    const chunks = chunkDocument(content, 1000, 150); // 15% overlap
     expect(chunks.length).toBeGreaterThan(1);
 
     // With overlap, positions should be closer together than without
@@ -567,13 +610,15 @@ describe("Document Chunking", () => {
   });
 
   test("chunkDocument prefers paragraph breaks", () => {
-    const content = "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.".repeat(50);
+    const content =
+      "First paragraph.\n\nSecond paragraph.\n\nThird paragraph.".repeat(50);
     const chunks = chunkDocument(content, 500, 0);
 
     // Chunks should end at paragraph breaks when possible
     for (const chunk of chunks.slice(0, -1)) {
       // Most chunks should end near a paragraph break
-      const endsNearParagraph = chunk.text.endsWith("\n\n") ||
+      const endsNearParagraph =
+        chunk.text.endsWith("\n\n") ||
         chunk.text.endsWith(".") ||
         chunk.text.endsWith("\n");
       // This is a soft check - not all chunks can end at breaks
@@ -593,7 +638,7 @@ describe("Document Chunking", () => {
 
   test("chunkDocument with default params uses 800-token chunks", () => {
     // Default is CHUNK_SIZE_CHARS (3200 chars) with CHUNK_OVERLAP_CHARS (480 chars)
-    const content = "Word ".repeat(2000);  // ~10000 chars
+    const content = "Word ".repeat(2000); // ~10000 chars
     const chunks = chunkDocument(content);
     expect(chunks.length).toBeGreaterThan(1);
     // Each chunk should be around 3200 chars (except last)
@@ -622,7 +667,7 @@ describe("Token-based Chunking", () => {
 
     // Each chunk should have ~800 tokens or less
     for (const chunk of chunks) {
-      expect(chunk.tokens).toBeLessThanOrEqual(850);  // Allow slight overage
+      expect(chunk.tokens).toBeLessThanOrEqual(850); // Allow slight overage
       expect(chunk.tokens).toBeGreaterThan(0);
     }
 
@@ -636,8 +681,8 @@ describe("Token-based Chunking", () => {
   });
 
   test("chunkDocumentByTokens creates overlapping chunks", async () => {
-    const content = "Word ".repeat(500);  // ~500 tokens
-    const chunks = await chunkDocumentByTokens(content, 200, 30);  // 15% overlap
+    const content = "Word ".repeat(500); // ~500 tokens
+    const chunks = await chunkDocumentByTokens(content, 200, 30); // 15% overlap
 
     expect(chunks.length).toBeGreaterThan(1);
 
@@ -657,7 +702,7 @@ describe("Token-based Chunking", () => {
     expect(chunks).toHaveLength(1);
     // The token count should be reasonable (not 0, not equal to char count)
     expect(chunks[0]!.tokens).toBeGreaterThan(0);
-    expect(chunks[0]!.tokens).toBeLessThan(content.length);  // Tokens < chars for English
+    expect(chunks[0]!.tokens).toBeLessThan(content.length); // Tokens < chars for English
   });
 });
 
@@ -716,7 +761,10 @@ describe("Path Context", () => {
 
   test("getContextForFile returns matching context", async () => {
     const store = await createTestStore();
-    const collectionName = await createTestCollection({ pwd: "/test/collection", glob: "**/*.md" });
+    const collectionName = await createTestCollection({
+      pwd: "/test/collection",
+      glob: "**/*.md",
+    });
     await addPathContext(collectionName, "/docs", "Documentation files");
 
     // Insert a document so getContextForFile can find it
@@ -733,7 +781,10 @@ describe("Path Context", () => {
 
   test("getContextForFile returns all matching contexts", async () => {
     const store = await createTestStore();
-    const collectionName = await createTestCollection({ pwd: "/test/collection", glob: "**/*.md" });
+    const collectionName = await createTestCollection({
+      pwd: "/test/collection",
+      glob: "**/*.md",
+    });
     await addPathContext(collectionName, "/", "General test files");
     await addPathContext(collectionName, "/docs", "Documentation files");
     await addPathContext(collectionName, "/docs/api", "API documentation");
@@ -753,9 +804,15 @@ describe("Path Context", () => {
     });
 
     // Context now returns ALL matching contexts joined with \n\n
-    expect(store.getContextForFile("/test/collection/readme.md")).toBe("General test files");
-    expect(store.getContextForFile("/test/collection/docs/guide.md")).toBe("General test files\n\nDocumentation files");
-    expect(store.getContextForFile("/test/collection/docs/api/reference.md")).toBe("General test files\n\nDocumentation files\n\nAPI documentation");
+    expect(store.getContextForFile("/test/collection/readme.md")).toBe(
+      "General test files",
+    );
+    expect(store.getContextForFile("/test/collection/docs/guide.md")).toBe(
+      "General test files\n\nDocumentation files",
+    );
+    expect(
+      store.getContextForFile("/test/collection/docs/api/reference.md"),
+    ).toBe("General test files\n\nDocumentation files\n\nAPI documentation");
 
     await cleanupTestDb(store);
   });
@@ -768,7 +825,10 @@ describe("Path Context", () => {
 describe("Collections", () => {
   test("collections are managed via YAML config", async () => {
     const store = await createTestStore();
-    const collectionName = await createTestCollection({ pwd: "/home/user/projects/myapp", glob: "**/*.md" });
+    const collectionName = await createTestCollection({
+      pwd: "/home/user/projects/myapp",
+      glob: "**/*.md",
+    });
 
     // Collections are now in YAML, not in the database
     expect(collectionName).toBe("myapp");
@@ -865,8 +925,16 @@ describe("FTS Search", () => {
 
   test("searchFTS filters by collection name", async () => {
     const store = await createTestStore();
-    const collection1 = await createTestCollection({ pwd: "/path/one", glob: "**/*.md", name: "one" });
-    const collection2 = await createTestCollection({ pwd: "/path/two", glob: "**/*.md", name: "two" });
+    const collection1 = await createTestCollection({
+      pwd: "/path/one",
+      glob: "**/*.md",
+      name: "one",
+    });
+    const collection2 = await createTestCollection({
+      pwd: "/path/two",
+      glob: "**/*.md",
+      name: "two",
+    });
 
     await insertTestDocument(store.db, collection1, {
       name: "doc1",
@@ -884,7 +952,11 @@ describe("FTS Search", () => {
     expect(allResults).toHaveLength(2);
 
     // Filter by collection name (collectionId is now treated as collection name string)
-    const filtered = store.searchFTS("searchable", 10, collection1 as unknown as number);
+    const filtered = store.searchFTS(
+      "searchable",
+      10,
+      collection1 as unknown as number,
+    );
     expect(filtered).toHaveLength(1);
     expect(filtered[0]!.displayPath).toBe(`${collection1}/doc1.md`);
 
@@ -943,7 +1015,10 @@ describe("Document Retrieval", () => {
   describe("findDocument", () => {
     test("findDocument finds by exact filepath", async () => {
       const store = await createTestStore();
-      const collectionName = await createTestCollection({ pwd: "/exact/path", glob: "**/*.md" });
+      const collectionName = await createTestCollection({
+        pwd: "/exact/path",
+        glob: "**/*.md",
+      });
       await insertTestDocument(store.db, collectionName, {
         name: "mydoc",
         title: "My Document",
@@ -965,7 +1040,10 @@ describe("Document Retrieval", () => {
 
     test("findDocument finds by display_path", async () => {
       const store = await createTestStore();
-      const collectionName = await createTestCollection({ pwd: "/some/path", glob: "**/*.md" });
+      const collectionName = await createTestCollection({
+        pwd: "/some/path",
+        glob: "**/*.md",
+      });
       await insertTestDocument(store.db, collectionName, {
         name: "mydoc",
         displayPath: "docs/mydoc.md",
@@ -979,7 +1057,10 @@ describe("Document Retrieval", () => {
 
     test("findDocument finds by partial path match", async () => {
       const store = await createTestStore();
-      const collectionName = await createTestCollection({ pwd: "/very/long/path/to", glob: "**/*.md" });
+      const collectionName = await createTestCollection({
+        pwd: "/very/long/path/to",
+        glob: "**/*.md",
+      });
       await insertTestDocument(store.db, collectionName, {
         name: "mydoc",
         displayPath: "mydoc.md",
@@ -993,14 +1074,19 @@ describe("Document Retrieval", () => {
 
     test("findDocument includes body when requested", async () => {
       const store = await createTestStore();
-      const collectionName = await createTestCollection({ pwd: "/path", glob: "**/*.md" });
+      const collectionName = await createTestCollection({
+        pwd: "/path",
+        glob: "**/*.md",
+      });
       await insertTestDocument(store.db, collectionName, {
         name: "mydoc",
         displayPath: "mydoc.md",
         body: "The actual body content",
       });
 
-      const result = store.findDocument("/path/mydoc.md", { includeBody: true });
+      const result = store.findDocument("/path/mydoc.md", {
+        includeBody: true,
+      });
       expect("error" in result).toBe(false);
       if (!("error" in result)) {
         expect(result.body).toBe("The actual body content");
@@ -1047,7 +1133,10 @@ describe("Document Retrieval", () => {
     test("findDocument expands ~ to home directory", async () => {
       const store = await createTestStore();
       const home = homedir();
-      const collectionName = await createTestCollection({ pwd: home, name: "home" });
+      const collectionName = await createTestCollection({
+        pwd: home,
+        name: "home",
+      });
       await insertTestDocument(store.db, collectionName, {
         name: "mydoc",
         filepath: `${home}/docs/mydoc.md`,
@@ -1080,7 +1169,10 @@ describe("Document Retrieval", () => {
 
     test("findDocument includes hierarchical contexts (global + collection + path)", async () => {
       const store = await createTestStore();
-      const collectionName = await createTestCollection({ pwd: "/archive", name: "archive" });
+      const collectionName = await createTestCollection({
+        pwd: "/archive",
+        name: "archive",
+      });
 
       // Add global context
       await addGlobalContext("Global context for all documents");
@@ -1090,7 +1182,11 @@ describe("Document Retrieval", () => {
 
       // Add path-specific contexts at different levels
       await addPathContext(collectionName, "/podcasts", "Podcast episodes");
-      await addPathContext(collectionName, "/podcasts/external", "External podcast interviews");
+      await addPathContext(
+        collectionName,
+        "/podcasts/external",
+        "External podcast interviews",
+      );
 
       // Insert document in nested path
       await insertTestDocument(store.db, collectionName, {
@@ -1098,15 +1194,17 @@ describe("Document Retrieval", () => {
         displayPath: "podcasts/external/2024-jan-interview.md",
       });
 
-      const result = store.findDocument("/archive/podcasts/external/2024-jan-interview.md");
+      const result = store.findDocument(
+        "/archive/podcasts/external/2024-jan-interview.md",
+      );
       expect("error" in result).toBe(false);
       if (!("error" in result)) {
         // Should have all contexts joined with double newlines
         expect(result.context).toBe(
           "Global context for all documents\n\n" +
-          "Archive collection context\n\n" +
-          "Podcast episodes\n\n" +
-          "External podcast interviews"
+            "Archive collection context\n\n" +
+            "Podcast episodes\n\n" +
+            "External podcast interviews",
         );
       }
 
@@ -1236,7 +1334,9 @@ describe("Document Retrieval", () => {
       expect(docs).toHaveLength(1);
       expect(docs[0]!.skipped).toBe(true);
       if (docs[0]!.skipped) {
-        expect((docs[0] as { skipped: true; skipReason: string }).skipReason).toContain("too large");
+        expect(
+          (docs[0] as { skipped: true; skipReason: string }).skipReason,
+        ).toContain("too large");
       }
 
       await cleanupTestDb(store);
@@ -1256,13 +1356,14 @@ describe("Document Retrieval", () => {
       const { docs } = store.findDocuments("doc1.md", { includeBody: true });
       expect(docs[0]!.skipped).toBe(false);
       if (!docs[0]!.skipped) {
-        expect((docs[0] as { doc: { body: string }; skipped: false }).doc.body).toBe("The content");
+        expect(
+          (docs[0] as { doc: { body: string }; skipped: false }).doc.body,
+        ).toBe("The content");
       }
 
       await cleanupTestDb(store);
     });
   });
-
 });
 
 // =============================================================================
@@ -1271,7 +1372,8 @@ describe("Document Retrieval", () => {
 
 describe("Snippet Extraction", () => {
   test("extractSnippet finds query terms", () => {
-    const body = "First line.\nSecond line with keyword.\nThird line.\nFourth line.";
+    const body =
+      "First line.\nSecond line with keyword.\nThird line.\nFourth line.";
     const { line, snippet } = extractSnippet(body, "keyword", 500);
 
     expect(line).toBe(2); // Line 2 contains "keyword"
@@ -1297,7 +1399,10 @@ describe("Snippet Extraction", () => {
   });
 
   test("extractSnippet uses chunkPos hint", () => {
-    const body = "First section...\n".repeat(50) + "Target keyword here\n" + "More content...".repeat(50);
+    const body =
+      "First section...\n".repeat(50) +
+      "Target keyword here\n" +
+      "More content...".repeat(50);
     const chunkPos = body.indexOf("Target keyword");
 
     const { snippet } = extractSnippet(body, "Target", 200, chunkPos);
@@ -1314,18 +1419,26 @@ describe("Snippet Extraction", () => {
 
   test("extractSnippet includes diff-style header", () => {
     const body = "Line 1\nLine 2\nLine 3 has keyword\nLine 4\nLine 5";
-    const { snippet, linesBefore, linesAfter, snippetLines } = extractSnippet(body, "keyword", 500);
+    const { snippet, linesBefore, linesAfter, snippetLines } = extractSnippet(
+      body,
+      "keyword",
+      500,
+    );
 
     // Header should show line position and context info
     expect(snippet).toMatch(/^@@ -\d+,\d+ @@ \(\d+ before, \d+ after\)/);
     expect(linesBefore).toBe(1); // Line 1 comes before
-    expect(linesAfter).toBe(0);  // Snippet includes to end (lines 2-5)
+    expect(linesAfter).toBe(0); // Snippet includes to end (lines 2-5)
     expect(snippetLines).toBe(4); // Lines 2, 3, 4, 5
   });
 
   test("extractSnippet calculates linesBefore and linesAfter correctly", () => {
     const body = "L1\nL2\nL3\nL4 match\nL5\nL6\nL7\nL8\nL9\nL10";
-    const { linesBefore, linesAfter, snippetLines, line } = extractSnippet(body, "match", 500);
+    const { linesBefore, linesAfter, snippetLines, line } = extractSnippet(
+      body,
+      "match",
+      500,
+    );
 
     expect(line).toBe(4); // "L4 match" is line 4
     expect(linesBefore).toBe(2); // L1, L2 before snippet (snippet starts at L3)
@@ -1338,39 +1451,53 @@ describe("Snippet Extraction", () => {
     const { snippet } = extractSnippet(body, "keyword", 500);
 
     // Should start with @@ -line,count @@ (N before, M after)
-    const headerMatch = snippet.match(/^@@ -(\d+),(\d+) @@ \((\d+) before, (\d+) after\)/);
+    const headerMatch = snippet.match(
+      /^@@ -(\d+),(\d+) @@ \((\d+) before, (\d+) after\)/,
+    );
     expect(headerMatch).not.toBeNull();
 
     const [, startLine, count, before, after] = headerMatch!;
     expect(parseInt(startLine!)).toBe(2); // Snippet starts at line 2 (B)
-    expect(parseInt(count!)).toBe(4);     // 4 lines: B, C keyword, D, E
-    expect(parseInt(before!)).toBe(1);    // A is before
-    expect(parseInt(after!)).toBe(3);     // F, G, H are after
+    expect(parseInt(count!)).toBe(4); // 4 lines: B, C keyword, D, E
+    expect(parseInt(before!)).toBe(1); // A is before
+    expect(parseInt(after!)).toBe(3); // F, G, H are after
   });
 
   test("extractSnippet at document start shows 0 before", () => {
     const body = "First line keyword\nSecond\nThird\nFourth\nFifth";
-    const { linesBefore, linesAfter, snippetLines, line } = extractSnippet(body, "keyword", 500);
+    const { linesBefore, linesAfter, snippetLines, line } = extractSnippet(
+      body,
+      "keyword",
+      500,
+    );
 
-    expect(line).toBe(1);         // Keyword on first line
-    expect(linesBefore).toBe(0);  // Nothing before
+    expect(line).toBe(1); // Keyword on first line
+    expect(linesBefore).toBe(0); // Nothing before
     expect(snippetLines).toBe(3); // First, Second, Third (bestLine-1 to bestLine+3, clamped)
-    expect(linesAfter).toBe(2);   // Fourth, Fifth
+    expect(linesAfter).toBe(2); // Fourth, Fifth
   });
 
   test("extractSnippet at document end shows 0 after", () => {
     const body = "First\nSecond\nThird\nFourth\nFifth keyword";
-    const { linesBefore, linesAfter, snippetLines, line } = extractSnippet(body, "keyword", 500);
+    const { linesBefore, linesAfter, snippetLines, line } = extractSnippet(
+      body,
+      "keyword",
+      500,
+    );
 
-    expect(line).toBe(5);         // Keyword on last line
-    expect(linesBefore).toBe(3);  // First, Second, Third before snippet
+    expect(line).toBe(5); // Keyword on last line
+    expect(linesBefore).toBe(3); // First, Second, Third before snippet
     expect(snippetLines).toBe(2); // Fourth, Fifth keyword (bestLine-1 to bestLine+3, clamped)
-    expect(linesAfter).toBe(0);   // Nothing after
+    expect(linesAfter).toBe(0); // Nothing after
   });
 
   test("extractSnippet with single line document", () => {
     const body = "Single line with keyword";
-    const { linesBefore, linesAfter, snippetLines, snippet } = extractSnippet(body, "keyword", 500);
+    const { linesBefore, linesAfter, snippetLines, snippet } = extractSnippet(
+      body,
+      "keyword",
+      500,
+    );
 
     expect(linesBefore).toBe(0);
     expect(linesAfter).toBe(0);
@@ -1385,7 +1512,12 @@ describe("Snippet Extraction", () => {
     const body = padding + "Target keyword here\nMore content\nEven more";
     const chunkPos = padding.length; // Position of "Target keyword"
 
-    const { line, linesBefore, linesAfter } = extractSnippet(body, "keyword", 200, chunkPos);
+    const { line, linesBefore, linesAfter } = extractSnippet(
+      body,
+      "keyword",
+      200,
+      chunkPos,
+    );
 
     expect(line).toBe(51); // "Target keyword" is line 51
     expect(linesBefore).toBeGreaterThan(40); // Many lines before
@@ -1427,9 +1559,9 @@ describe("Reciprocal Rank Fusion", () => {
     const fused = reciprocalRankFusion([list1, list2]);
 
     // doc2 appears in both lists, should have higher combined score
-    expect(fused.find(r => r.file === "doc2")).toBeDefined();
-    expect(fused.find(r => r.file === "doc1")).toBeDefined();
-    expect(fused.find(r => r.file === "doc3")).toBeDefined();
+    expect(fused.find((r) => r.file === "doc2")).toBeDefined();
+    expect(fused.find((r) => r.file === "doc1")).toBeDefined();
+    expect(fused.find((r) => r.file === "doc3")).toBeDefined();
   });
 
   test("RRF respects weights", () => {
@@ -1452,8 +1584,8 @@ describe("Reciprocal Rank Fusion", () => {
 
     // doc1 should get +0.05 bonus for being #1
     // doc2 should get +0.02 bonus for being #2-3
-    const doc1 = fused.find(r => r.file === "doc1");
-    const doc2 = fused.find(r => r.file === "doc2");
+    const doc1 = fused.find((r) => r.file === "doc1");
+    const doc2 = fused.find((r) => r.file === "doc2");
 
     expect(doc1!.score).toBeGreaterThan(doc2!.score);
   });
@@ -1496,9 +1628,18 @@ describe("Index Status", () => {
     const store = await createTestStore();
     const collectionName = await createTestCollection();
 
-    await insertTestDocument(store.db, collectionName, { name: "doc1", active: 1 });
-    await insertTestDocument(store.db, collectionName, { name: "doc2", active: 1 });
-    await insertTestDocument(store.db, collectionName, { name: "doc3", active: 0 }); // inactive
+    await insertTestDocument(store.db, collectionName, {
+      name: "doc1",
+      active: 1,
+    });
+    await insertTestDocument(store.db, collectionName, {
+      name: "doc2",
+      active: 1,
+    });
+    await insertTestDocument(store.db, collectionName, {
+      name: "doc3",
+      active: 0,
+    }); // inactive
 
     const status = store.getStatus();
     expect(status.totalDocuments).toBe(2); // Only active docs
@@ -1508,12 +1649,15 @@ describe("Index Status", () => {
 
   test("getStatus reports collection info", async () => {
     const store = await createTestStore();
-    const collectionName = await createTestCollection({ pwd: "/test/path", glob: "**/*.md" });
+    const collectionName = await createTestCollection({
+      pwd: "/test/path",
+      glob: "**/*.md",
+    });
     await insertTestDocument(store.db, collectionName, { name: "doc1" });
 
     const status = store.getStatus();
     expect(status.collections.length).toBeGreaterThanOrEqual(1);
-    const col = status.collections.find(c => c.name === collectionName);
+    const col = status.collections.find((c) => c.name === collectionName);
     expect(col).toBeDefined();
     expect(col?.path).toBe("/test/path");
     expect(col?.pattern).toBe("**/*.md");
@@ -1527,9 +1671,18 @@ describe("Index Status", () => {
     const collectionName = await createTestCollection();
 
     // Add documents with different hashes
-    await insertTestDocument(store.db, collectionName, { name: "doc1", hash: "hash1" });
-    await insertTestDocument(store.db, collectionName, { name: "doc2", hash: "hash2" });
-    await insertTestDocument(store.db, collectionName, { name: "doc3", hash: "hash1" }); // same hash as doc1
+    await insertTestDocument(store.db, collectionName, {
+      name: "doc1",
+      hash: "hash1",
+    });
+    await insertTestDocument(store.db, collectionName, {
+      name: "doc2",
+      hash: "hash2",
+    });
+    await insertTestDocument(store.db, collectionName, {
+      name: "doc3",
+      hash: "hash1",
+    }); // same hash as doc1
 
     const needsEmbedding = store.getHashesNeedingEmbedding();
     expect(needsEmbedding).toBe(2); // hash1 and hash2
@@ -1615,7 +1768,9 @@ describe("Fuzzy Matching", () => {
 
     const matches = store.matchFilesByGlob("journals/*.md");
     expect(matches).toHaveLength(2);
-    expect(matches.every(m => m.displayPath.startsWith("journals/"))).toBe(true);
+    expect(matches.every((m) => m.displayPath.startsWith("journals/"))).toBe(
+      true,
+    );
 
     await cleanupTestDb(store);
   });
@@ -1630,17 +1785,25 @@ describe("Vector Table", () => {
     const store = await createTestStore();
 
     // Initially no vector table
-    let exists = store.db.prepare(`
+    let exists = store.db
+      .prepare(
+        `
       SELECT name FROM sqlite_master WHERE type='table' AND name='vectors_vec'
-    `).get();
+    `,
+      )
+      .get();
     expect(exists).toBeFalsy(); // null or undefined
 
     // Create vector table
     store.ensureVecTable(768);
 
-    exists = store.db.prepare(`
+    exists = store.db
+      .prepare(
+        `
       SELECT name FROM sqlite_master WHERE type='table' AND name='vectors_vec'
-    `).get();
+    `,
+      )
+      .get();
     expect(exists).toBeTruthy();
 
     await cleanupTestDb(store);
@@ -1653,17 +1816,25 @@ describe("Vector Table", () => {
     store.ensureVecTable(768);
 
     // Check dimensions
-    let tableInfo = store.db.prepare(`
+    let tableInfo = store.db
+      .prepare(
+        `
       SELECT sql FROM sqlite_master WHERE type='table' AND name='vectors_vec'
-    `).get() as { sql: string };
+    `,
+      )
+      .get() as { sql: string };
     expect(tableInfo.sql).toContain("float[768]");
 
     // Recreate with different dimensions
     store.ensureVecTable(1024);
 
-    tableInfo = store.db.prepare(`
+    tableInfo = store.db
+      .prepare(
+        `
       SELECT sql FROM sqlite_master WHERE type='table' AND name='vectors_vec'
-    `).get() as { sql: string };
+    `,
+      )
+      .get() as { sql: string };
     expect(tableInfo.sql).toContain("float[1024]");
 
     await cleanupTestDb(store);
@@ -1677,7 +1848,10 @@ describe("Vector Table", () => {
 describe("Integration", () => {
   test("full document lifecycle: create, search, retrieve", async () => {
     const store = await createTestStore();
-    const collectionName = await createTestCollection({ pwd: "/test/notes", glob: "**/*.md" });
+    const collectionName = await createTestCollection({
+      pwd: "/test/notes",
+      glob: "**/*.md",
+    });
 
     // Add context - use "/" for collection root
     await addPathContext(collectionName, "/", "Personal notes");
@@ -1718,7 +1892,9 @@ describe("Integration", () => {
     }
 
     // Multi-get
-    const { docs, errors } = store.findDocuments("notes/*.md", { includeBody: true });
+    const { docs, errors } = store.findDocuments("notes/*.md", {
+      includeBody: true,
+    });
     expect(errors).toHaveLength(0);
     expect(docs).toHaveLength(2);
 
@@ -1729,8 +1905,16 @@ describe("Integration", () => {
     const store1 = await createTestStore();
     const store2 = await createTestStore();
 
-    const col1 = await createTestCollection({ pwd: "/store1", glob: "**/*.md", name: "store1" });
-    const col2 = await createTestCollection({ pwd: "/store2", glob: "**/*.md", name: "store2" });
+    const col1 = await createTestCollection({
+      pwd: "/store1",
+      glob: "**/*.md",
+      name: "store1",
+    });
+    const col2 = await createTestCollection({
+      pwd: "/store2",
+      glob: "**/*.md",
+      name: "store2",
+    });
 
     await insertTestDocument(store1.db, col1, {
       name: "doc1",
@@ -1803,9 +1987,17 @@ describe("LlamaCpp Integration", () => {
 
     // Create vector table and insert a vector
     store.ensureVecTable(768);
-    const embedding = Array(768).fill(0).map(() => Math.random());
-    store.db.prepare(`INSERT INTO content_vectors (hash, seq, pos, model, embedded_at) VALUES (?, 0, 0, 'test', ?)`).run(hash, new Date().toISOString());
-    store.db.prepare(`INSERT INTO vectors_vec (hash_seq, embedding) VALUES (?, ?)`).run(`${hash}_0`, new Float32Array(embedding));
+    const embedding = Array(768)
+      .fill(0)
+      .map(() => Math.random());
+    store.db
+      .prepare(
+        `INSERT INTO content_vectors (hash, seq, pos, model, embedded_at) VALUES (?, 0, 0, 'test', ?)`,
+      )
+      .run(hash, new Date().toISOString());
+    store.db
+      .prepare(`INSERT INTO vectors_vec (hash_seq, embedding) VALUES (?, ?)`)
+      .run(`${hash}_0`, new Float32Array(embedding));
 
     const results = await store.searchVec("test query", "embeddinggemma", 10);
     expect(results).toHaveLength(1);
@@ -1818,8 +2010,14 @@ describe("LlamaCpp Integration", () => {
 
   test("searchVec filters by collection name", async () => {
     const store = await createTestStore();
-    const collection1 = await createTestCollection({ name: "coll1", pwd: "/test/coll1" });
-    const collection2 = await createTestCollection({ name: "coll2", pwd: "/test/coll2" });
+    const collection1 = await createTestCollection({
+      name: "coll1",
+      pwd: "/test/coll1",
+    });
+    const collection2 = await createTestCollection({
+      name: "coll2",
+      pwd: "/test/coll2",
+    });
 
     const hash1 = "hash1abc";
     const hash2 = "hash2xyz";
@@ -1838,19 +2036,40 @@ describe("LlamaCpp Integration", () => {
 
     // Create vectors_vec table with correct dimensions (768 for embeddinggemma)
     store.ensureVecTable(768);
-    const embedding1 = Array(768).fill(0).map(() => Math.random());
-    const embedding2 = Array(768).fill(0).map(() => Math.random());
-    store.db.prepare(`INSERT INTO content_vectors (hash, seq, pos, model, embedded_at) VALUES (?, 0, 0, 'test', ?)`).run(hash1, new Date().toISOString());
-    store.db.prepare(`INSERT INTO content_vectors (hash, seq, pos, model, embedded_at) VALUES (?, 0, 0, 'test', ?)`).run(hash2, new Date().toISOString());
-    store.db.prepare(`INSERT INTO vectors_vec (hash_seq, embedding) VALUES (?, ?)`).run(`${hash1}_0`, new Float32Array(embedding1));
-    store.db.prepare(`INSERT INTO vectors_vec (hash_seq, embedding) VALUES (?, ?)`).run(`${hash2}_0`, new Float32Array(embedding2));
+    const embedding1 = Array(768)
+      .fill(0)
+      .map(() => Math.random());
+    const embedding2 = Array(768)
+      .fill(0)
+      .map(() => Math.random());
+    store.db
+      .prepare(
+        `INSERT INTO content_vectors (hash, seq, pos, model, embedded_at) VALUES (?, 0, 0, 'test', ?)`,
+      )
+      .run(hash1, new Date().toISOString());
+    store.db
+      .prepare(
+        `INSERT INTO content_vectors (hash, seq, pos, model, embedded_at) VALUES (?, 0, 0, 'test', ?)`,
+      )
+      .run(hash2, new Date().toISOString());
+    store.db
+      .prepare(`INSERT INTO vectors_vec (hash_seq, embedding) VALUES (?, ?)`)
+      .run(`${hash1}_0`, new Float32Array(embedding1));
+    store.db
+      .prepare(`INSERT INTO vectors_vec (hash_seq, embedding) VALUES (?, ?)`)
+      .run(`${hash2}_0`, new Float32Array(embedding2));
 
     // Search without filter - should return both
     const allResults = await store.searchVec("content", "embeddinggemma", 10);
     expect(allResults).toHaveLength(2);
 
     // Search with collection filter - should return only from collection1
-    const filtered = await store.searchVec("content", "embeddinggemma", 10, collection1 as unknown as number);
+    const filtered = await store.searchVec(
+      "content",
+      "embeddinggemma",
+      10,
+      collection1,
+    );
     expect(filtered).toHaveLength(1);
     expect(filtered[0]!.collectionName).toBe(collection1);
 
@@ -1875,9 +2094,17 @@ describe("LlamaCpp Integration", () => {
 
     // Create vector table and insert a test vector
     store.ensureVecTable(768);
-    const embedding = Array(768).fill(0).map(() => Math.random());
-    store.db.prepare(`INSERT INTO content_vectors (hash, seq, pos, model, embedded_at) VALUES (?, 0, 0, 'test', ?)`).run(hash, new Date().toISOString());
-    store.db.prepare(`INSERT INTO vectors_vec (hash_seq, embedding) VALUES (?, ?)`).run(`${hash}_0`, new Float32Array(embedding));
+    const embedding = Array(768)
+      .fill(0)
+      .map(() => Math.random());
+    store.db
+      .prepare(
+        `INSERT INTO content_vectors (hash, seq, pos, model, embedded_at) VALUES (?, 0, 0, 'test', ?)`,
+      )
+      .run(hash, new Date().toISOString());
+    store.db
+      .prepare(`INSERT INTO vectors_vec (hash_seq, embedding) VALUES (?, ?)`)
+      .run(`${hash}_0`, new Float32Array(embedding));
 
     // This should complete quickly (not hang) due to the two-step fix
     // The old code with JOINs in the sqlite-vec query would hang indefinitely
@@ -2042,7 +2269,7 @@ describe("Edge Cases", () => {
         name: `concurrent${i}`,
         body: `Content ${i} searchterm`,
         displayPath: `concurrent${i}.md`,
-      })
+      }),
     );
 
     await Promise.all(inserts);
@@ -2064,8 +2291,14 @@ describe("Content-Addressable Storage", () => {
     const store = await createTestStore();
 
     // Create two collections
-    const collection1 = await createTestCollection({ pwd: "/path/collection1", name: "collection1" });
-    const collection2 = await createTestCollection({ pwd: "/path/collection2", name: "collection2" });
+    const collection1 = await createTestCollection({
+      pwd: "/path/collection1",
+      name: "collection1",
+    });
+    const collection2 = await createTestCollection({
+      pwd: "/path/collection2",
+      name: "collection2",
+    });
 
     // Add same content to both collections
     const content = "# Same Content\n\nThis is the same content in two places.";
@@ -2084,14 +2317,20 @@ describe("Content-Addressable Storage", () => {
     });
 
     // Both should have the same hash
-    const hash1Db = store.db.prepare(`SELECT hash FROM documents WHERE id = ?`).get(doc1) as { hash: string };
-    const hash2Db = store.db.prepare(`SELECT hash FROM documents WHERE id = ?`).get(doc2) as { hash: string };
+    const hash1Db = store.db
+      .prepare(`SELECT hash FROM documents WHERE id = ?`)
+      .get(doc1) as { hash: string };
+    const hash2Db = store.db
+      .prepare(`SELECT hash FROM documents WHERE id = ?`)
+      .get(doc2) as { hash: string };
 
     expect(hash1Db.hash).toBe(hash2Db.hash);
     expect(hash1Db.hash).toBe(hash1);
 
     // There should only be one entry in the content table
-    const contentCount = store.db.prepare(`SELECT COUNT(*) as count FROM content WHERE hash = ?`).get(hash1) as { count: number };
+    const contentCount = store.db
+      .prepare(`SELECT COUNT(*) as count FROM content WHERE hash = ?`)
+      .get(hash1) as { count: number };
     expect(contentCount.count).toBe(1);
 
     await cleanupTestDb(store);
@@ -2101,8 +2340,14 @@ describe("Content-Addressable Storage", () => {
     const store = await createTestStore();
 
     // Create two collections
-    const collection1 = await createTestCollection({ pwd: "/path/collection1", name: "collection1" });
-    const collection2 = await createTestCollection({ pwd: "/path/collection2", name: "collection2" });
+    const collection1 = await createTestCollection({
+      pwd: "/path/collection1",
+      name: "collection1",
+    });
+    const collection2 = await createTestCollection({
+      pwd: "/path/collection2",
+      name: "collection2",
+    });
 
     // Add same content to both collections
     const sharedContent = "# Shared Content\n\nThis is shared.";
@@ -2131,26 +2376,40 @@ describe("Content-Addressable Storage", () => {
     });
 
     // Verify both hashes exist in content table
-    const sharedExists1 = store.db.prepare(`SELECT hash FROM content WHERE hash = ?`).get(sharedHash);
-    const uniqueExists1 = store.db.prepare(`SELECT hash FROM content WHERE hash = ?`).get(uniqueHash);
+    const sharedExists1 = store.db
+      .prepare(`SELECT hash FROM content WHERE hash = ?`)
+      .get(sharedHash);
+    const uniqueExists1 = store.db
+      .prepare(`SELECT hash FROM content WHERE hash = ?`)
+      .get(uniqueHash);
     expect(sharedExists1).toBeTruthy();
     expect(uniqueExists1).toBeTruthy();
 
     // Remove collection1 documents (collections are in YAML now)
-    store.db.prepare(`DELETE FROM documents WHERE collection = ?`).run(collection1);
+    store.db
+      .prepare(`DELETE FROM documents WHERE collection = ?`)
+      .run(collection1);
 
     // Clean up orphaned content (mimics what the CLI does)
-    store.db.prepare(`
+    store.db
+      .prepare(
+        `
       DELETE FROM content
       WHERE hash NOT IN (SELECT DISTINCT hash FROM documents WHERE active = 1)
-    `).run();
+    `,
+      )
+      .run();
 
     // Shared content should still exist (used by collection2)
-    const sharedExists2 = store.db.prepare(`SELECT hash FROM content WHERE hash = ?`).get(sharedHash);
+    const sharedExists2 = store.db
+      .prepare(`SELECT hash FROM content WHERE hash = ?`)
+      .get(sharedHash);
     expect(sharedExists2).toBeTruthy();
 
     // Unique content should be removed (only used by collection1)
-    const uniqueExists2 = store.db.prepare(`SELECT hash FROM content WHERE hash = ?`).get(uniqueHash);
+    const uniqueExists2 = store.db
+      .prepare(`SELECT hash FROM content WHERE hash = ?`)
+      .get(uniqueHash);
     expect(uniqueExists2).toBeFalsy();
 
     await cleanupTestDb(store);
@@ -2165,7 +2424,10 @@ describe("Content-Addressable Storage", () => {
     // Create 5 collections with the same content
     const collectionNames = [];
     for (let i = 0; i < 5; i++) {
-      const collName = await createTestCollection({ pwd: `/path/collection${i}`, name: `collection${i}` });
+      const collName = await createTestCollection({
+        pwd: `/path/collection${i}`,
+        name: `collection${i}`,
+      });
       collectionNames.push(collName);
 
       await insertTestDocument(store.db, collName, {
@@ -2176,15 +2438,21 @@ describe("Content-Addressable Storage", () => {
     }
 
     // Should have 5 documents
-    const docCount = store.db.prepare(`SELECT COUNT(*) as count FROM documents WHERE active = 1`).get() as { count: number };
+    const docCount = store.db
+      .prepare(`SELECT COUNT(*) as count FROM documents WHERE active = 1`)
+      .get() as { count: number };
     expect(docCount.count).toBe(5);
 
     // But only 1 content entry
-    const contentCount = store.db.prepare(`SELECT COUNT(*) as count FROM content WHERE hash = ?`).get(sharedHash) as { count: number };
+    const contentCount = store.db
+      .prepare(`SELECT COUNT(*) as count FROM content WHERE hash = ?`)
+      .get(sharedHash) as { count: number };
     expect(contentCount.count).toBe(1);
 
     // All documents should point to the same hash
-    const hashes = store.db.prepare(`SELECT DISTINCT hash FROM documents WHERE active = 1`).all() as { hash: string }[];
+    const hashes = store.db
+      .prepare(`SELECT DISTINCT hash FROM documents WHERE active = 1`)
+      .all() as { hash: string }[];
     expect(hashes).toHaveLength(1);
     expect(hashes[0]!.hash).toBe(sharedHash);
 
@@ -2216,15 +2484,21 @@ describe("Content-Addressable Storage", () => {
     });
 
     // Both hashes should exist in content table
-    const hash1Db = store.db.prepare(`SELECT hash FROM documents WHERE id = ?`).get(doc1) as { hash: string };
-    const hash2Db = store.db.prepare(`SELECT hash FROM documents WHERE id = ?`).get(doc2) as { hash: string };
+    const hash1Db = store.db
+      .prepare(`SELECT hash FROM documents WHERE id = ?`)
+      .get(doc1) as { hash: string };
+    const hash2Db = store.db
+      .prepare(`SELECT hash FROM documents WHERE id = ?`)
+      .get(doc2) as { hash: string };
 
     expect(hash1Db.hash).toBe(hash1);
     expect(hash2Db.hash).toBe(hash2);
     expect(hash1Db.hash).not.toBe(hash2Db.hash);
 
     // Should have 2 entries in content table
-    const contentCount = store.db.prepare(`SELECT COUNT(*) as count FROM content`).get() as { count: number };
+    const contentCount = store.db
+      .prepare(`SELECT COUNT(*) as count FROM content`)
+      .get() as { count: number };
     expect(contentCount.count).toBe(2);
 
     await cleanupTestDb(store);
@@ -2237,19 +2511,33 @@ describe("Content-Addressable Storage", () => {
 
 describe("normalizeVirtualPath", () => {
   test("already normalized qmd:// path passes through", () => {
-    expect(normalizeVirtualPath("qmd://collection/path.md")).toBe("qmd://collection/path.md");
-    expect(normalizeVirtualPath("qmd://journals/2025-01-01.md")).toBe("qmd://journals/2025-01-01.md");
+    expect(normalizeVirtualPath("qmd://collection/path.md")).toBe(
+      "qmd://collection/path.md",
+    );
+    expect(normalizeVirtualPath("qmd://journals/2025-01-01.md")).toBe(
+      "qmd://journals/2025-01-01.md",
+    );
   });
 
   test("handles //collection/path format (missing qmd: prefix)", () => {
-    expect(normalizeVirtualPath("//collection/path.md")).toBe("qmd://collection/path.md");
-    expect(normalizeVirtualPath("//journals/2025-01-01.md")).toBe("qmd://journals/2025-01-01.md");
+    expect(normalizeVirtualPath("//collection/path.md")).toBe(
+      "qmd://collection/path.md",
+    );
+    expect(normalizeVirtualPath("//journals/2025-01-01.md")).toBe(
+      "qmd://journals/2025-01-01.md",
+    );
   });
 
   test("handles qmd:// with extra slashes", () => {
-    expect(normalizeVirtualPath("qmd:////collection/path.md")).toBe("qmd://collection/path.md");
-    expect(normalizeVirtualPath("qmd:///journals/2025-01-01.md")).toBe("qmd://journals/2025-01-01.md");
-    expect(normalizeVirtualPath("qmd:///////archive/file.md")).toBe("qmd://archive/file.md");
+    expect(normalizeVirtualPath("qmd:////collection/path.md")).toBe(
+      "qmd://collection/path.md",
+    );
+    expect(normalizeVirtualPath("qmd:///journals/2025-01-01.md")).toBe(
+      "qmd://journals/2025-01-01.md",
+    );
+    expect(normalizeVirtualPath("qmd:///////archive/file.md")).toBe(
+      "qmd://archive/file.md",
+    );
   });
 
   test("handles collection root paths", () => {
@@ -2261,17 +2549,27 @@ describe("normalizeVirtualPath", () => {
   test("preserves bare collection/path format (not auto-converted)", () => {
     // Bare paths without qmd:// or // prefix are NOT converted
     // (could be relative filesystem paths)
-    expect(normalizeVirtualPath("collection/path.md")).toBe("collection/path.md");
-    expect(normalizeVirtualPath("journals/2025-01-01.md")).toBe("journals/2025-01-01.md");
+    expect(normalizeVirtualPath("collection/path.md")).toBe(
+      "collection/path.md",
+    );
+    expect(normalizeVirtualPath("journals/2025-01-01.md")).toBe(
+      "journals/2025-01-01.md",
+    );
   });
 
   test("preserves absolute filesystem paths", () => {
-    expect(normalizeVirtualPath("/Users/test/file.md")).toBe("/Users/test/file.md");
-    expect(normalizeVirtualPath("/absolute/path/file.md")).toBe("/absolute/path/file.md");
+    expect(normalizeVirtualPath("/Users/test/file.md")).toBe(
+      "/Users/test/file.md",
+    );
+    expect(normalizeVirtualPath("/absolute/path/file.md")).toBe(
+      "/absolute/path/file.md",
+    );
   });
 
   test("preserves home-relative paths", () => {
-    expect(normalizeVirtualPath("~/Documents/file.md")).toBe("~/Documents/file.md");
+    expect(normalizeVirtualPath("~/Documents/file.md")).toBe(
+      "~/Documents/file.md",
+    );
   });
 
   test("preserves docid format", () => {
@@ -2280,8 +2578,12 @@ describe("normalizeVirtualPath", () => {
   });
 
   test("handles whitespace trimming", () => {
-    expect(normalizeVirtualPath("  qmd://collection/path.md  ")).toBe("qmd://collection/path.md");
-    expect(normalizeVirtualPath("  //collection/path.md  ")).toBe("qmd://collection/path.md");
+    expect(normalizeVirtualPath("  qmd://collection/path.md  ")).toBe(
+      "qmd://collection/path.md",
+    );
+    expect(normalizeVirtualPath("  //collection/path.md  ")).toBe(
+      "qmd://collection/path.md",
+    );
   });
 });
 
@@ -2420,7 +2722,7 @@ describe("normalizeDocid", () => {
   });
 
   test("does not strip mismatched quotes", () => {
-    expect(normalizeDocid('"abc123\'')).toBe('"abc123\'');
+    expect(normalizeDocid("\"abc123'")).toBe("\"abc123'");
     expect(normalizeDocid("'abc123\"")).toBe("'abc123\"");
   });
 });

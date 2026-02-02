@@ -45,10 +45,8 @@ export function SearchResults({
 
   return (
     <div className={cn('flex h-full flex-col')}>
-      {/* Header */}
-
       {query && (
-        <div className="flex items-center justify-between z-0 -my-1 px-2">
+        <div className="flex items-center justify-between z-0 border-b h-12 px-2">
           <h2 className="text-sm font-medium ">
             Search Results
             {query && (
@@ -59,9 +57,8 @@ export function SearchResults({
         </div>
       )}
 
-      {/* Results List */}
-      <ScrollArea className="flex-1">
-        <div className="space-y-2 p-4">
+      <ScrollArea className="flex-1 h-[calc(100vh-7rem)]">
+        <div className="space-y-3 p-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="h-6 w-6 animate-spin rounded-full border" />
@@ -132,6 +129,7 @@ export function SearchResults({
             ))
           )}
         </div>
+        <div className="h-20"></div>
       </ScrollArea>
     </div>
   )

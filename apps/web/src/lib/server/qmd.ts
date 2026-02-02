@@ -81,7 +81,7 @@ export const getCollectionFiles = createServerFn()
     const { name } = data
     if (!name) throw new Error('Collection name required')
     const store = await getStore()
-    getActiveDocumentPaths(store.db, name)
+    return getActiveDocumentPaths(store.db, name)
   })
 
 export const createCollection = createServerFn().handler(async (ctx) => {
@@ -418,10 +418,6 @@ export const getFileContent = createServerFn().handler(async (ctx) => {
   } as FileContent
 })
 
-/**
- * Get document content by collection name and file path
- * Mimics CLI `qmd get qmd://<collection>/<filename>` behavior
- */
 export interface DocumentContent {
   content: string
   filepath: string

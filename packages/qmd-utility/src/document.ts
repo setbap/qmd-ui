@@ -32,7 +32,7 @@ export interface DocumentResult {
  */
 function detectCollectionFromPath(
   fsPath: string,
-  collections: NamedCollection[]
+  collections: NamedCollection[],
 ): { collectionName: string; relativePath: string } | null {
   const realPath = getRealPath(fsPath);
 
@@ -70,7 +70,7 @@ function detectCollectionFromPath(
 export function fetchDocument(
   db: Database,
   filename: string,
-  collections?: NamedCollection[]
+  collections?: NamedCollection[],
 ): DocumentResult {
   // Handle docid lookup (#abc123, abc123, "#abc123", "abc123", etc.)
   let inputPath = filename;
@@ -101,7 +101,7 @@ export function fetchDocument(
       FROM documents d
       JOIN content ON content.hash = d.hash
       WHERE d.collection = ? AND d.path = ? AND d.active = 1
-    `
+    `,
       )
       .get(parsed.collectionName, parsed.path) as typeof doc;
 
@@ -115,7 +115,7 @@ export function fetchDocument(
         JOIN content ON content.hash = d.hash
         WHERE d.collection = ? AND d.path LIKE ? AND d.active = 1
         LIMIT 1
-      `
+      `,
         )
         .get(parsed.collectionName, `%${parsed.path}`) as typeof doc;
     }
@@ -135,7 +135,7 @@ export function fetchDocument(
               .prepare(
                 `
           SELECT 1 FROM documents WHERE collection = ? AND active = 1 LIMIT 1
-        `
+        `,
               )
               .get(possibleCollection)
           : null;
@@ -149,7 +149,7 @@ export function fetchDocument(
             FROM documents d
             JOIN content ON content.hash = d.hash
             WHERE d.collection = ? AND d.path = ? AND d.active = 1
-          `
+          `,
             )
             .get(possibleCollection || "", possiblePath || "") as {
             collectionName: string;
@@ -167,7 +167,7 @@ export function fetchDocument(
               JOIN content ON content.hash = d.hash
               WHERE d.collection = ? AND d.path LIKE ? AND d.active = 1
               LIMIT 1
-            `
+            `,
               )
               .get(possibleCollection || "", `%${possiblePath}`) as {
               collectionName: string;
@@ -209,7 +209,7 @@ export function fetchDocument(
           FROM documents d
           JOIN content ON content.hash = d.hash
           WHERE d.collection = ? AND d.path = ? AND d.active = 1
-        `
+        `,
           )
           .get(detected.collectionName, detected.relativePath) as {
           collectionName: string;
@@ -229,7 +229,7 @@ export function fetchDocument(
           JOIN content ON content.hash = d.hash
           WHERE d.path LIKE ? AND d.active = 1
           LIMIT 1
-        `
+        `,
           )
           .get(`%${filenameOnly}`) as {
           collectionName: string;

@@ -6,6 +6,7 @@ import { CollectionPanel } from '@/components/CollectionPanel'
 import { SearchResults } from '@/components/SearchResults'
 import { CommandPalette } from '@/components/CommandPalette'
 import { FileViewer } from '@/components/FileViewer'
+import { FileContentPanel } from '@/components/FileContentPanel'
 import { CreateCollectionDialog } from '@/components/CreateCollectionDialog'
 import { SettingsDialog, type Settings } from '@/components/SettingsDialog'
 import { useCollections } from '@/hooks/useCollections'
@@ -18,10 +19,22 @@ import { embedCollection, getDocumentByCollection } from '@/lib/server/qmd'
 import type { SearchResult } from '@/components/SearchResults'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from '@/components/ui/resizable'
 
 export const Route = createFileRoute('/')({
   component: HomeComponent,
 })
+
+interface SelectedFile {
+  path: string
+  collectionName: string
+  title: string
+  content: string
+}
 
 function HomeComponent() {
   // Hooks
@@ -37,6 +50,7 @@ function HomeComponent() {
   const [viewingCollection, setViewingCollection] = useState<string | null>(
     null,
   )
+  const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null)
 
   // File content query
   const fileContent = useFileContent(viewingFile, viewingCollection)
@@ -176,7 +190,14 @@ function HomeComponent() {
                   },
                 })
                 console.log('File content loaded:', result)
-                // Show the content in a modal or use it as needed
+                // Show content in the split panel
+                setSelectedFile({
+                  path,
+                  collectionName,
+                  title: result.title || path.split('/').pop() || path,
+                  content: result.content,
+                })
+                // Also update viewing state for modal fallback
                 setViewingFile(path)
                 setViewingCollection(collectionName)
               } catch (err) {
@@ -187,15 +208,47 @@ function HomeComponent() {
           />
         }
       >
-        <div className="flex w-full gap-4">
-          <div className="flex h-full w-full flex-col">
-            <SearchResults
-              results={search.results}
-              isLoading={search.isLoading}
-              query={search.query}
-              onSelectResult={handleSelectResult}
-            />
-          </div>
+        <div className="flex w-full flex-col overflow-hidden">
+          {selectedFile ? (
+            <ResizablePanelGroup className="h-full">
+              <ResizablePanel
+                defaultSize={50}
+                minSize={30}
+                className="h-full overflow-hidden"
+              >
+                <div className="h-full overflow-hidden">
+                  <SearchResults
+                    results={search.results}
+                    isLoading={search.isLoading}
+                    query={search.query}
+                    onSelectResult={handleSelectResult}
+                  />
+                </div>
+              </ResizablePanel>
+              <ResizableHandle withHandle />
+              <ResizablePanel
+                defaultSize={50}
+                minSize={30}
+                className="h-full overflow-hidden"
+              >
+                <FileContentPanel
+                  title={selectedFile.title}
+                  content={selectedFile.content}
+                  path={`qmd://${selectedFile.collectionName}/${selectedFile.path}`}
+                  onClose={() => setSelectedFile(null)}
+                />
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          ) : (
+            <div className="h-full overflow-hidden">
+              <SearchResults
+                results={search.results}
+                isLoading={search.isLoading}
+                query={search.query}
+                onSelectResult={handleSelectResult}
+              />
+            </div>
+          )}
 
           <SearchBar
             value={search.query}

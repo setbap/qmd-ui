@@ -122,7 +122,7 @@ export type RerankOptions = {
 /**
  * Supported query types for different search backends
  */
-export type QueryType = 'lex' | 'vec' | 'hyde';
+export type QueryType = "lex" | "vec" | "hyde";
 
 /**
  * A single query and its target backend type
@@ -147,10 +147,13 @@ export type RerankDocument = {
 
 // HuggingFace model URIs for node-llama-cpp
 // Format: hf:<user>/<repo>/<file>
-const DEFAULT_EMBED_MODEL = "hf:ggml-org/embeddinggemma-300M-GGUF/embeddinggemma-300M-Q8_0.gguf";
-const DEFAULT_RERANK_MODEL = "hf:ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF/qwen3-reranker-0.6b-q8_0.gguf";
+const DEFAULT_EMBED_MODEL =
+  "hf:ggml-org/embeddinggemma-300M-GGUF/embeddinggemma-300M-Q8_0.gguf";
+const DEFAULT_RERANK_MODEL =
+  "hf:ggml-org/Qwen3-Reranker-0.6B-Q8_0-GGUF/qwen3-reranker-0.6b-q8_0.gguf";
 // const DEFAULT_GENERATE_MODEL = "hf:ggml-org/Qwen3-0.6B-GGUF/Qwen3-0.6B-Q8_0.gguf";
-const DEFAULT_GENERATE_MODEL = "hf:tobil/qmd-query-expansion-1.7B-gguf/qmd-query-expansion-1.7B-q4_k_m.gguf";
+const DEFAULT_GENERATE_MODEL =
+  "hf:tobil/qmd-query-expansion-1.7B-gguf/qmd-query-expansion-1.7B-q4_k_m.gguf";
 
 // Local model cache directory
 const MODEL_CACHE_DIR = join(homedir(), ".cache", "qmd", "models");
@@ -171,7 +174,10 @@ export interface LLM {
   /**
    * Generate text completion
    */
-  generate(prompt: string, options?: GenerateOptions): Promise<GenerateResult | null>;
+  generate(
+    prompt: string,
+    options?: GenerateOptions,
+  ): Promise<GenerateResult | null>;
 
   /**
    * Check if a model exists/is available
@@ -182,13 +188,20 @@ export interface LLM {
    * Expand a search query into multiple variations for different backends.
    * Returns a list of Queryable objects.
    */
-  expandQuery(query: string, options?: { context?: string, includeLexical?: boolean }): Promise<Queryable[]>;
+  expandQuery(
+    query: string,
+    options?: { context?: string; includeLexical?: boolean },
+  ): Promise<Queryable[]>;
 
   /**
    * Rerank documents by relevance to a query
    * Returns list of documents with relevance scores (higher = more relevant)
    */
-  rerank(query: string, documents: RerankDocument[], options?: RerankOptions): Promise<RerankResult>;
+  rerank(
+    query: string,
+    documents: RerankDocument[],
+    options?: RerankOptions,
+  ): Promise<RerankResult>;
 
   /**
    * Dispose of resources
@@ -234,7 +247,9 @@ export class LlamaCpp implements LLM {
   private embedContext: LlamaEmbeddingContext | null = null;
   private generateModel: LlamaModel | null = null;
   private rerankModel: LlamaModel | null = null;
-  private rerankContext: Awaited<ReturnType<LlamaModel["createRankingContext"]>> | null = null;
+  private rerankContext: Awaited<
+    ReturnType<LlamaModel["createRankingContext"]>
+  > | null = null;
 
   private embedModelUri: string;
   private generateModelUri: string;
@@ -243,7 +258,8 @@ export class LlamaCpp implements LLM {
 
   // Ensure we don't load the same model/context concurrently (which can allocate duplicate VRAM).
   private embedModelLoadPromise: Promise<LlamaModel> | null = null;
-  private embedContextCreatePromise: Promise<LlamaEmbeddingContext> | null = null;
+  private embedContextCreatePromise: Promise<LlamaEmbeddingContext> | null =
+    null;
   private generateModelLoadPromise: Promise<LlamaModel> | null = null;
   private rerankModelLoadPromise: Promise<LlamaModel> | null = null;
 
@@ -255,13 +271,13 @@ export class LlamaCpp implements LLM {
   // Track disposal state to prevent double-dispose
   private disposed = false;
 
-
   constructor(config: LlamaCppConfig = {}) {
     this.embedModelUri = config.embedModel || DEFAULT_EMBED_MODEL;
     this.generateModelUri = config.generateModel || DEFAULT_GENERATE_MODEL;
     this.rerankModelUri = config.rerankModel || DEFAULT_RERANK_MODEL;
     this.modelCacheDir = config.modelCacheDir || MODEL_CACHE_DIR;
-    this.inactivityTimeoutMs = config.inactivityTimeoutMs ?? DEFAULT_INACTIVITY_TIMEOUT_MS;
+    this.inactivityTimeoutMs =
+      config.inactivityTimeoutMs ?? DEFAULT_INACTIVITY_TIMEOUT_MS;
     this.disposeModelsOnInactivity = config.disposeModelsOnInactivity ?? false;
   }
 
@@ -279,7 +295,7 @@ export class LlamaCpp implements LLM {
     // Only set timer if we have disposable contexts and timeout is enabled
     if (this.inactivityTimeoutMs > 0 && this.hasLoadedContexts()) {
       this.inactivityTimer = setTimeout(() => {
-        this.unloadIdleResources().catch(err => {
+        this.unloadIdleResources().catch((err) => {
           console.error("Error unloading idle resources:", err);
         });
       }, this.inactivityTimeoutMs);
@@ -427,7 +443,7 @@ export class LlamaCpp implements LLM {
       }
     }
     this.touchActivity();
-    return this.embedContext;
+    return this.embedContext!;
   }
 
   /**
@@ -489,7 +505,9 @@ export class LlamaCpp implements LLM {
   /**
    * Load rerank context (lazy). Context can be disposed and recreated without reloading the model.
    */
-  private async ensureRerankContext(): Promise<Awaited<ReturnType<LlamaModel["createRankingContext"]>>> {
+  private async ensureRerankContext(): Promise<
+    Awaited<ReturnType<LlamaModel["createRankingContext"]>>
+  > {
     if (!this.rerankContext) {
       const model = await this.ensureRerankModel();
       this.rerankContext = await model.createRankingContext();
@@ -507,7 +525,7 @@ export class LlamaCpp implements LLM {
    * Returns tokenizer tokens (opaque type from node-llama-cpp)
    */
   async tokenize(text: string): Promise<readonly LlamaToken[]> {
-    await this.ensureEmbedContext();  // Ensure model is loaded
+    await this.ensureEmbedContext(); // Ensure model is loaded
     if (!this.embedModel) {
       throw new Error("Embed model not loaded");
     }
@@ -537,7 +555,10 @@ export class LlamaCpp implements LLM {
   // Core API methods
   // ==========================================================================
 
-  async embed(text: string, options: EmbedOptions = {}): Promise<EmbeddingResult | null> {
+  async embed(
+    text: string,
+    options: EmbedOptions = {},
+  ): Promise<EmbeddingResult | null> {
     try {
       const context = await this.ensureEmbedContext();
       const embedding = await context.getEmbeddingFor(text);
@@ -575,7 +596,7 @@ export class LlamaCpp implements LLM {
             console.error("Embedding error for text:", err);
             return null;
           }
-        })
+        }),
       );
 
       return embeddings;
@@ -585,7 +606,10 @@ export class LlamaCpp implements LLM {
     }
   }
 
-  async generate(prompt: string, options: GenerateOptions = {}): Promise<GenerateResult | null> {
+  async generate(
+    prompt: string,
+    options: GenerateOptions = {},
+  ): Promise<GenerateResult | null> {
     // Ensure model is loaded
     await this.ensureGenerateModel();
 
@@ -637,7 +661,10 @@ export class LlamaCpp implements LLM {
   // High-level abstractions
   // ==========================================================================
 
-  async expandQuery(query: string, options: { context?: string, includeLexical?: boolean } = {}): Promise<Queryable[]> {
+  async expandQuery(
+    query: string,
+    options: { context?: string; includeLexical?: boolean } = {},
+  ): Promise<Queryable[]> {
     const llama = await this.ensureLlama();
     await this.ensureGenerateModel();
 
@@ -650,7 +677,7 @@ export class LlamaCpp implements LLM {
         line ::= type ": " content "\\n"
         type ::= "lex" | "vec" | "hyde"
         content ::= [^\\n]+
-      `
+      `,
     });
 
     const prompt = `You are a search query optimization expert. Your task is to improve retrieval by rewriting queries and generating hypothetical documents.
@@ -709,25 +736,27 @@ Final Output:`;
       });
 
       const lines = result.trim().split("\n");
-      const queryables: Queryable[] = lines.map(line => {
-        const colonIdx = line.indexOf(":");
-        if (colonIdx === -1) return null;
-        const type = line.slice(0, colonIdx).trim();
-        if (type !== 'lex' && type !== 'vec' && type !== 'hyde') return null;
-        const text = line.slice(colonIdx + 1).trim();
-        return { type: type as QueryType, text };
-      }).filter((q): q is Queryable => q !== null);
+      const queryables: Queryable[] = lines
+        .map((line) => {
+          const colonIdx = line.indexOf(":");
+          if (colonIdx === -1) return null;
+          const type = line.slice(0, colonIdx).trim();
+          if (type !== "lex" && type !== "vec" && type !== "hyde") return null;
+          const text = line.slice(colonIdx + 1).trim();
+          return { type: type as QueryType, text };
+        })
+        .filter((q): q is Queryable => q !== null);
 
       // Filter out lex entries if not requested
       if (!includeLexical) {
-        return queryables.filter(q => q.type !== 'lex');
+        return queryables.filter((q) => q.type !== "lex");
       }
       return queryables;
     } catch (error) {
       console.error("Structured query expansion failed:", error);
       // Fallback to original query
-      const fallback: Queryable[] = [{ type: 'vec', text: query }];
-      if (includeLexical) fallback.unshift({ type: 'lex', text: query });
+      const fallback: Queryable[] = [{ type: "vec", text: query }];
+      if (includeLexical) fallback.unshift({ type: "lex", text: query });
       return fallback;
     } finally {
       await genContext.dispose();
@@ -737,7 +766,7 @@ Final Output:`;
   async rerank(
     query: string,
     documents: RerankDocument[],
-    options: RerankOptions = {}
+    options: RerankOptions = {},
   ): Promise<RerankResult> {
     const context = await this.ensureRerankContext();
 
@@ -787,7 +816,9 @@ Final Output:`;
     // Note: llama.dispose() can hang indefinitely, so we use a timeout
     if (this.llama) {
       const disposePromise = this.llama.dispose();
-      const timeoutPromise = new Promise<void>((resolve) => setTimeout(resolve, 1000));
+      const timeoutPromise = new Promise<void>((resolve) =>
+        setTimeout(resolve, 1000),
+      );
       await Promise.race([disposePromise, timeoutPromise]);
     }
 
@@ -840,4 +871,3 @@ export async function disposeDefaultLlamaCpp(): Promise<void> {
     defaultLlamaCpp = null;
   }
 }
-
