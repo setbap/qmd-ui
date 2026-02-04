@@ -23,7 +23,17 @@ import {
   type SearchResult,
   type RankedResult,
 } from '@qmd/core'
-import { fetchDocument } from '@qmd/utility'
+import { fetchDocument, indexCollection } from '@qmd/utility'
+import {
+  createIndexingJob,
+  startJob,
+  completeJob,
+  failJob,
+  updateJobProgress,
+  getJob,
+  toSerializableJob,
+  type SerializableIndexingJob,
+} from './jobs'
 
 // Enable production mode for QMD
 import { execSync } from 'child_process'
@@ -53,6 +63,16 @@ export interface AppSettings {
   outputFormat: 'text' | 'json' | 'markdown'
   resultsPerPage: number
 }
+
+export interface CreateCollectionResult {
+  success: boolean
+  name: string
+  jobId: string
+  message: string
+}
+
+// Re-export SerializableIndexingJob from jobs module
+export type { SerializableIndexingJob } from './jobs'
 
 // =============================================================================
 // Store Instance (singleton pattern for server)
@@ -91,9 +111,56 @@ export const createCollection = createServerFn().handler(async (ctx) => {
     pattern?: string
   }
   const { name, path, pattern = '**/*.md' } = data
+
+  // First, add the collection to config
   addCollection(name, path, pattern)
-  return { success: true, name }
+
+  // Create a job for async indexing
+  const job = createIndexingJob(name)
+
+  // Start indexing in the background (don't await)
+  startIndexingJob(job.id, name, path, pattern)
+
+  return {
+    success: true,
+    name,
+    jobId: job.id,
+    message: 'Collection created. Indexing in progress...',
+  } as CreateCollectionResult
 })
+
+async function startIndexingJob(
+  jobId: string,
+  collectionName: string,
+  collectionPath: string,
+  pattern: string,
+): Promise<void> {
+  const store = await getStore()
+  const job = getJob(jobId)
+  if (!job) return
+
+  // Mark job as running
+  startJob(jobId)
+
+  try {
+    // Run the indexing operation
+    const result = await indexCollection({
+      db: store.db,
+      path: collectionPath,
+      pattern,
+      collectionName,
+      signal: job.abortController?.signal,
+      onProgress: async (progress) => {
+        updateJobProgress(jobId, progress)
+      },
+      suppressEmbedNotice: true,
+    })
+
+    completeJob(jobId, result)
+  } catch (error) {
+    failJob(jobId, error as Error)
+  }
+}
 
 export const deleteCollection = createServerFn().handler(async (ctx) => {
   const data = ctx.data as unknown as { name: string }
@@ -145,6 +212,18 @@ export const embedCollection = createServerFn().handler(async () => {
     throw new Error(`Failed to generate embeddings: ${error}`)
   }
 })
+
+// =============================================================================
+// Job Operations
+// =============================================================================
+
+export const getJobStatus = createServerFn()
+  .inputValidator((data: { jobId: string }) => data)
+  .handler(async ({ data }): Promise<SerializableIndexingJob | null> => {
+    const { jobId } = data
+    const job = getJob(jobId)
+    return job ? toSerializableJob(job) : null
+  })
 
 // =============================================================================
 // Search Operations

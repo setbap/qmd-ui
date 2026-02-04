@@ -1,24 +1,22 @@
 import { createFileRoute, useSearch, useNavigate } from '@tanstack/react-router'
-import { useState, useCallback, useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { Layout } from '@/components/Layout'
 import { SearchBar } from '@/components/SearchBar'
-import { CollectionPanel } from '@/components/CollectionPanel'
+import { CollectionPanel } from '@/components/collection/CollectionPanel'
 import { SearchResults } from '@/components/SearchResults'
 import { CommandPalette } from '@/components/CommandPalette'
 import { FileContentPanel } from '@/components/FileContentPanel'
 import { CreateCollectionDialog } from '@/components/CreateCollectionDialog'
 import { SettingsDialog, type Settings } from '@/components/SettingsDialog'
+import {
+  SearchHistoryButton,
+  SearchHistoryModal,
+} from '@/components/modals/SearchHistoryModal'
 import { useCollections } from '@/hooks/useCollections'
-import { useAppSearch } from '@/hooks/useSearch'
 import { useSettings } from '@/hooks/useSettings'
 import { Toaster } from '@/components/ui/sonner'
 import { toast } from 'sonner'
-import {
-  embedCollection,
-  getDocumentByCollection,
-  type SearchMode,
-} from '@/lib/server/qmd'
-import type { SearchResult } from '@/components/SearchResults'
+import { embedCollection, type SearchMode } from '@/lib/server/qmd'
 import { Button } from '@/components/ui/button'
 import { Kbd } from '@/components/ui/kbd'
 import {
@@ -26,18 +24,11 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from '@/components/ui/resizable'
+import { useUIStore, useFileViewerStore, useSearchStore } from '@/stores'
 
 export const Route = createFileRoute('/')({
   component: HomeComponent,
 })
-
-interface SelectedFile {
-  path: string
-  collectionName: string
-  title: string
-  content: string
-  lineNumber?: number
-}
 
 // URL search params type
 interface HomeSearchParams {
@@ -48,18 +39,60 @@ interface HomeSearchParams {
 }
 
 function HomeComponent() {
-  // Hooks
+  // Server state hooks (React Query)
   const collections = useCollections()
-  const search = useAppSearch()
   const settings = useSettings()
   const navigate = useNavigate({ from: Route.fullPath })
   const searchParams = useSearch({ from: Route.fullPath }) as HomeSearchParams
 
-  // Modal states
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [selectedFile, setSelectedFile] = useState<SelectedFile | null>(null)
+  // UI State (Zustand stores)
+  const {
+    isCommandPaletteOpen,
+    isCreateDialogOpen,
+    isSettingsOpen,
+    openCommandPalette,
+    closeCommandPalette,
+    openCreateDialog,
+    closeCreateDialog,
+    openSettings,
+    closeSettings,
+  } = useUIStore()
+
+  const {
+    selectedFile,
+    openFromSearch,
+    openFromCollection,
+    close: closeFileViewer,
+  } = useFileViewerStore()
+
+  const {
+    query,
+    setQuery,
+    mode,
+    setMode,
+    collection,
+    setCollection,
+    executeSearch,
+    results,
+    isLoading: isSearchLoading,
+  } = useSearchStore()
+
+  // Sync URL params to store on mount
+  useEffect(() => {
+    const queryFromUrl = searchParams.q
+    const modeFromUrl = searchParams.m as SearchMode
+    const collectionFromUrl = searchParams.c
+
+    if (queryFromUrl) setQuery(queryFromUrl)
+    if (modeFromUrl) setMode(modeFromUrl)
+    if (collectionFromUrl) setCollection(collectionFromUrl)
+
+    // Execute search if query exists
+    if (queryFromUrl?.trim()) {
+      executeSearch()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Load file from URL on mount
   useEffect(() => {
@@ -83,18 +116,7 @@ function HomeComponent() {
       }
 
       try {
-        const result = await getDocumentByCollection({
-          data: {
-            collectionName,
-            path: filePath,
-          },
-        })
-        setSelectedFile({
-          path: filePath,
-          collectionName,
-          title: result.title || filePath.split('/').pop() || filePath,
-          content: result.content,
-        })
+        await openFromCollection(filePath, collectionName)
       } catch (err) {
         console.error('Failed to load file from URL:', err)
         toast.error(`Failed to load file: ${filePath}`)
@@ -105,22 +127,39 @@ function HomeComponent() {
     }
 
     loadFileFromUrl()
-  }, [searchParams, navigate])
+  }, [searchParams.file])
 
-  // Execute search from URL on page load (if query param exists)
+  // Update URL when search params change
   useEffect(() => {
-    const queryFromUrl = searchParams.q
-    if (queryFromUrl && queryFromUrl.trim()) {
-      // Execute search with params from URL
-      search.executeSearch({
-        query: queryFromUrl,
-        mode: (searchParams.m as SearchMode) || 'query',
-        collection: searchParams.c || null,
+    const urlParams: Record<string, string> = {}
+
+    // Preserve existing file param if present
+    if (searchParams.file) {
+      urlParams.file = searchParams.file
+    }
+
+    if (query.trim()) urlParams.q = query.trim()
+    if (mode !== 'query') urlParams.m = mode
+    if (collection) urlParams.c = collection
+
+    navigate({
+      to: '/',
+      search: urlParams,
+      replace: true,
+    })
+  }, [query, mode, collection])
+
+  // Update URL when selected file changes
+  useEffect(() => {
+    if (selectedFile) {
+      const fileParam = `qmd://${selectedFile.collectionName}/${selectedFile.path}`
+      navigate({
+        to: '/',
+        search: { ...searchParams, file: fileParam },
+        replace: true,
       })
     }
-    // Only run on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [selectedFile?.path, selectedFile?.collectionName])
 
   // Keyboard shortcuts: Ctrl+K for Command Palette, / for Search focus
   useEffect(() => {
@@ -128,12 +167,11 @@ function HomeComponent() {
       // Ctrl+K or Cmd+K: Open Command Palette
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
         e.preventDefault()
-        setIsCommandPaletteOpen(true)
+        openCommandPalette()
       }
       // / key: Focus search input (when not in an input field)
       if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const target = e.target as HTMLElement
-        // Don't trigger if user is typing in an input, textarea, or contenteditable element
         if (
           target.tagName === 'INPUT' ||
           target.tagName === 'TEXTAREA' ||
@@ -147,7 +185,7 @@ function HomeComponent() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [openCommandPalette])
 
   // Command palette actions
   const handleCommandAction = useCallback(
@@ -162,33 +200,28 @@ function HomeComponent() {
         | 'vsearch'
         | 'query',
     ) => {
-      setIsCommandPaletteOpen(false)
+      closeCommandPalette()
 
       switch (action) {
         case 'search':
         case 'vsearch':
         case 'query':
-          // Set search mode and focus search input
-          // search.setMode(action)
-          search.executeSearch({
-            mode: action,
-            collection: search.collection,
-            query: search.query,
-          })
+          setMode(action)
+          if (query.trim()) {
+            await executeSearch()
+          }
           break
         case 'createCollection':
-          setIsCreateDialogOpen(true)
+          openCreateDialog()
           break
         case 'updateCollection':
-          // TODO: Show collection selection dialog
           toast.info('Select a collection to update')
           break
         case 'deleteCollection':
-          // TODO: Show collection selection dialog
           toast.info('Select a collection to delete')
           break
         case 'settings':
-          setIsSettingsOpen(true)
+          openSettings()
           break
         case 'embed':
           try {
@@ -203,106 +236,51 @@ function HomeComponent() {
           break
       }
     },
-    [search],
+    [
+      closeCommandPalette,
+      setMode,
+      query,
+      executeSearch,
+      openCreateDialog,
+      openSettings,
+    ],
   )
 
   // Handle collection selection
   const handleCollectionSelect = useCallback(
-    (name: string | null) => {
-      search.selectCollection(name)
+    async (name: string | null) => {
+      setCollection(name)
       // Re-run search if there's a query
-      if (search.query.trim()) {
-        search.executeSearch({ collection: name })
+      if (query.trim()) {
+        await executeSearch()
       }
     },
-    [search],
+    [setCollection, query, executeSearch],
   )
 
-  // Handle result selection - opens file in panel like collection file click
+  // Handle result selection - uses file viewer store
   const handleSelectResult = useCallback(
-    async (result: SearchResult) => {
+    async (result: {
+      filepath: string
+      title: string | null
+      content: string
+    }) => {
       try {
-        // Parse filepath: qmd://collection/path[:lineNumber]
-        const filepathMatch = result.filepath.match(/^qmd:\/\/([^/]+)\/(.+)$/)
-        if (!filepathMatch || !filepathMatch[1] || !filepathMatch[2]) {
-          throw new Error(`Invalid filepath format: ${result.filepath}`)
-        }
-
-        let extractedCollectionName = filepathMatch[1]
-        let path = filepathMatch[2]
-        let lineNumber: number | undefined
-
-        // Extract line number from path if present (e.g., "path:23")
-        const lineMatch = path.match(/:(\d+)$/)
-        if (lineMatch && lineMatch[1]) {
-          lineNumber = parseInt(lineMatch[1], 10)
-          path = path.replace(/:\d+$/, '')
-        }
-
-        const collectionName = result.collectionName || extractedCollectionName
-
-        const result_data = await getDocumentByCollection({
-          data: {
-            collectionName,
-            path,
-          },
-        })
-        console.clear()
-        console.log({ result_data })
-        // Show content in the split panel
-        setSelectedFile({
-          path,
-          collectionName,
-          title:
-            result_data.title || result.title || path.split('/').pop() || path,
-          content: result_data.content,
-          lineNumber,
-        })
-        // Update URL with file param while preserving other query params
-        const fileParam = `qmd://${collectionName}/${path}`
-        navigate({ search: { ...searchParams, file: fileParam } })
+        await openFromSearch(result)
       } catch (err) {
         console.error('Failed to load file:', err)
         toast.error(`Failed to load file: ${result.filepath}`)
       }
     },
-    [navigate, searchParams],
+    [openFromSearch],
   )
 
-  // Handle file click from CollectionPanel - updates URL
-  const handleFileClick = useCallback(
-    async (path: string, collectionName: string) => {
-      try {
-        const result = await getDocumentByCollection({
-          data: {
-            collectionName,
-            path,
-          },
-        })
-        // Show content in the split panel
-        setSelectedFile({
-          path,
-          collectionName,
-          title: result.title || path.split('/').pop() || path,
-          content: result.content,
-        })
-        // Update URL with file param while preserving other query params
-        const fileParam = `qmd://${collectionName}/${path}`
-        navigate({ search: { ...searchParams, file: fileParam } })
-      } catch (err) {
-        console.error('Failed to load file:', err)
-        toast.error(`Failed to load file: ${path}`)
-      }
-    },
-    [navigate, searchParams],
-  )
-
-  // Handle closing file viewer - clears only file param from URL
+  // Handle closing file viewer
   const handleCloseFile = useCallback(() => {
-    setSelectedFile(null)
+    closeFileViewer()
     const { file, ...restParams } = searchParams
     navigate({ search: restParams })
-  }, [navigate, searchParams])
+  }, [closeFileViewer, navigate, searchParams])
 
   // Convert AppSettings to Settings for the dialog
   const dialogSettings: Settings = {
@@ -312,62 +290,48 @@ function HomeComponent() {
       (settings.settings.outputFormat as Settings['outputFormat']) ?? 'cli',
   }
 
-  // Get selected file path for CollectionPanel highlighting
-  const selectedFilePath = selectedFile
-    ? `qmd://${selectedFile.collectionName}/${selectedFile.path}`
-    : null
-
   return (
     <>
       <Layout
-        logo={<h1>QMD for Web</h1>}
-        commandPalette={
-          <Button
-            size={'lg'}
-            variant={'outline'}
-            className={'w-64 justify-between'}
-            onClick={() => setIsCommandPaletteOpen(true)}
+        logo={
+          <h1
+            title="QMD Web"
+            className="select-none font-mono text-primary font-bold   bg-neutral-50 outline-1 px- p-1 rounded-md"
           >
-            <span>Search For commands...</span>
-            <Kbd>⌘K</Kbd>
-          </Button>
+            QMD Web
+          </h1>
+        }
+        commandPalette={
+          <div className="flex items-center gap-2">
+            <SearchHistoryButton />
+            <Button
+              size={'lg'}
+              variant={'outline'}
+              className={'w-64 justify-between'}
+              onClick={openCommandPalette}
+            >
+              <span>Search For commands...</span>
+              <Kbd>⌘K</Kbd>
+            </Button>
+          </div>
         }
         sideBar={
           <CollectionPanel
             collections={collections.collections}
             isLoading={collections.isLoading}
-            selectedCollection={search.collection}
-            expandedCollections={collections.expandedCollections}
+            selectedCollection={collection}
             onSelectCollection={handleCollectionSelect}
-            onToggleExpand={collections.toggleExpand}
-            onUpdateCollection={async (name) => {
-              try {
-                await collections.updateCollection(name)
-                toast.success(`Collection "${name}" updated`)
-              } catch {
-                toast.error(`Failed to update collection "${name}"`)
-              }
+            onUpdateCollection={async (name: string) => {
+              await collections.updateCollection(name)
             }}
-            onDeleteCollection={async (name) => {
-              try {
-                await collections.deleteCollection(name)
-                toast.success(`Collection "${name}" deleted`)
-              } catch {
-                toast.error(`Failed to delete collection "${name}"`)
-              }
+            onDeleteCollection={async (name: string) => {
+              await collections.deleteCollection(name)
             }}
-            onRenameCollection={async (oldName, newName) => {
-              try {
-                await collections.renameCollection({ oldName, newName })
-                toast.success(`Collection renamed to "${newName}"`)
-              } catch {
-                toast.error(`Failed to rename collection "${oldName}"`)
-              }
+            onRenameCollection={async (oldName: string, newName: string) => {
+              await collections.renameCollection({ oldName, newName })
             }}
-            onCreateCollection={() => setIsCreateDialogOpen(true)}
+            onCreateCollection={openCreateDialog}
             getCollectionFiles={collections.fetchCollectionFiles}
-            onFileClick={handleFileClick}
-            selectedFilePath={selectedFilePath}
           />
         }
       >
@@ -381,10 +345,10 @@ function HomeComponent() {
               >
                 <div className="h-full overflow-hidden">
                   <SearchResults
-                    results={search.results}
-                    isLoading={search.isLoading}
-                    query={search.query}
-                    onSelectResult={handleSelectResult}
+                    results={results as any}
+                    isLoading={isSearchLoading}
+                    query={query}
+                    onSelectResult={handleSelectResult as any}
                   />
                 </div>
               </ResizablePanel>
@@ -406,48 +370,57 @@ function HomeComponent() {
           ) : (
             <div className="h-full overflow-hidden">
               <SearchResults
-                results={search.results}
-                isLoading={search.isLoading}
-                query={search.query}
-                onSelectResult={handleSelectResult}
+                results={results as any}
+                isLoading={isSearchLoading}
+                query={query}
+                onSelectResult={handleSelectResult as any}
               />
             </div>
           )}
 
-          <SearchBar
-            value={search.query}
-            onChange={search.setQuery}
-            onSubmit={search.executeSearch}
-            mode={search.mode}
-            selectedCollection={search.collection}
-          />
+          <SearchBar />
         </div>
       </Layout>
 
       {/* Modals */}
       <CommandPalette
         open={isCommandPaletteOpen}
-        onOpenChange={setIsCommandPaletteOpen}
+        onOpenChange={closeCommandPalette}
         onAction={handleCommandAction}
       />
 
       <CreateCollectionDialog
         open={isCreateDialogOpen}
-        onOpenChange={setIsCreateDialogOpen}
+        onOpenChange={closeCreateDialog}
         onCreate={async (name: string, path: string, pattern: string) => {
           try {
             await collections.createCollection({ name, path, pattern })
-            toast.success(`Collection "${name}" created`)
-            setIsCreateDialogOpen(false)
-          } catch {
-            toast.error(`Failed to create collection "${name}"`)
+          } catch (err) {
+            console.error('Failed to create collection:', err)
           }
         }}
+        isCreating={collections.isCreating}
+        isIndexing={
+          collections.activeJobs.size > 0 &&
+          Array.from(collections.activeJobs.values()).some(
+            (job) => job.status === 'pending' || job.status === 'running',
+          )
+        }
+        indexingProgress={
+          collections.activeJobs.size > 0
+            ? (() => {
+                const jobs = Array.from(collections.activeJobs.values())
+                const runningJob =
+                  jobs.find((job) => job.status === 'running') || jobs[0]
+                return runningJob?.progress || null
+              })()
+            : null
+        }
       />
 
       <SettingsDialog
         open={isSettingsOpen}
-        onOpenChange={setIsSettingsOpen}
+        onOpenChange={closeSettings}
         settings={dialogSettings}
         onUpdate={async (data: Partial<Settings>) => {
           try {
@@ -462,6 +435,8 @@ function HomeComponent() {
           }
         }}
       />
+
+      <SearchHistoryModal />
 
       <Toaster theme="dark" position="bottom-right" />
     </>

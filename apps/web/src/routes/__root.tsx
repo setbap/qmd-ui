@@ -44,7 +44,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       <head>
         <HeadContent />
       </head>
-      <body className="bg-black">
+      <body className="bg-black overscroll-none">
         {children}
         <TanStackDevtools
           config={{

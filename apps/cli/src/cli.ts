@@ -23,7 +23,6 @@ import {
   getHashesForEmbedding,
   clearAllEmbeddings,
   insertEmbedding,
-  hashContent,
   extractTitle,
   formatDocForEmbedding,
   chunkDocument,
@@ -33,21 +32,12 @@ import {
   parseVirtualPath,
   buildVirtualPath,
   isVirtualPath,
-  insertContent,
-  insertDocument,
-  findActiveDocument,
-  updateDocumentTitle,
-  updateDocument,
-  deactivateDocument,
-  getActiveDocumentPaths,
-  cleanupOrphanedContent,
   deleteLLMCache,
   deleteInactiveDocuments,
   cleanupOrphanedVectors,
   vacuumDatabase,
   getCollectionsWithoutContext,
   getTopLevelPathsWithoutContext,
-  handelize,
   DEFAULT_EMBED_MODEL,
   DEFAULT_QUERY_MODEL,
   DEFAULT_RERANK_MODEL,
@@ -69,6 +59,13 @@ import {
   listAllContexts,
 } from "@qmd/core";
 import { escapeXml, escapeCSV, type OutputFormat } from "@qmd/formatter";
+import {
+  indexCollection,
+  formatIndexingETA,
+  renderProgressBar,
+} from "@qmd/utility";
+
+// Note: renderProgressBar is now imported from @qmd/utility, removing duplicate
 
 // Enable production mode - allows using default database path
 // Tests must set INDEX_PATH or use createStore() with explicit path
@@ -482,7 +479,30 @@ async function updateCollections(): Promise<void> {
       }
     }
 
-    await indexFiles(col.pwd, col.glob_pattern, col.name, true);
+    // Use progress.indeterminate() before starting and progress.set() during
+    progress.indeterminate();
+    let startTime = Date.now();
+    await indexCollection({
+      db: getDb(),
+      path: col.pwd,
+      pattern: col.glob_pattern,
+      collectionName: col.name,
+      onProgress: (prog) => {
+        progress.set(prog.percentComplete);
+        const elapsed = (Date.now() - startTime) / 1000;
+        const rate = prog.processedFiles / elapsed || 1;
+        const remaining = (prog.totalFiles - prog.processedFiles) / rate;
+        const eta =
+          prog.processedFiles > 2
+            ? ` ETA: ${formatIndexingETA(remaining)}`
+            : "";
+        process.stderr.write(
+          `\rIndexing: ${prog.processedFiles}/${prog.totalFiles}${eta}        `,
+        );
+      },
+      suppressEmbedNotice: true,
+    });
+    progress.clear();
     console.log("");
   }
 
@@ -1565,9 +1585,27 @@ async function collectionAdd(
   // Add to YAML config
   addCollection(collName, pwd, globPattern);
 
-  // Create the collection and index files
+  // Create the collection and index files using shared function
   console.log(`Creating collection '${collName}'...`);
-  await indexFiles(pwd, globPattern, collName);
+  await indexCollection({
+    db: getDb(),
+    path: pwd,
+    pattern: globPattern,
+    collectionName: collName,
+    onProgress: (progress) => {
+      const elapsed = (Date.now() - Date.now()) / 1000;
+      const rate = progress.processedFiles / elapsed || 1;
+      const remaining = (progress.totalFiles - progress.processedFiles) / rate;
+      const eta =
+        progress.processedFiles > 2
+          ? ` ETA: ${formatIndexingETA(remaining)}`
+          : "";
+      process.stderr.write(
+        `\rIndexing: ${progress.processedFiles}/${progress.totalFiles}${eta}        `,
+      );
+    },
+    suppressEmbedNotice: true,
+  });
   console.log(
     `${c.green}✓${c.reset} Collection '${collName}' created successfully`,
   );
@@ -1624,178 +1662,6 @@ function collectionRename(oldName: string, newName: string): void {
   console.log(
     `  Virtual paths updated: ${c.cyan}qmd://${oldName}/${c.reset} → ${c.cyan}qmd://${newName}/${c.reset}`,
   );
-}
-
-async function indexFiles(
-  pwd?: string,
-  globPattern: string = DEFAULT_GLOB,
-  collectionName?: string,
-  suppressEmbedNotice: boolean = false,
-): Promise<void> {
-  const db = getDb();
-  const resolvedPwd = pwd || getPwd();
-  const now = new Date().toISOString();
-  const excludeDirs = [
-    "node_modules",
-    ".git",
-    ".cache",
-    "vendor",
-    "dist",
-    "build",
-  ];
-
-  // Clear Ollama cache on index
-  clearCache(db);
-
-  // Collection name must be provided (from YAML)
-  if (!collectionName) {
-    throw new Error(
-      "Collection name is required. Collections must be defined in ~/.config/qmd/index.yml",
-    );
-  }
-
-  console.log(`Collection: ${resolvedPwd} (${globPattern})`);
-
-  progress.indeterminate();
-  const glob = new Bun.Glob(globPattern);
-  const files: string[] = [];
-  for await (const file of glob.scan({
-    cwd: resolvedPwd,
-    onlyFiles: true,
-    followSymlinks: true,
-  })) {
-    // Skip node_modules, hidden folders (.*), and other common excludes
-    const parts = file.split("/");
-    const shouldSkip = parts.some(
-      (part) =>
-        part === "node_modules" ||
-        part.startsWith(".") ||
-        excludeDirs.includes(part),
-    );
-    if (!shouldSkip) {
-      files.push(file);
-    }
-  }
-
-  const total = files.length;
-  if (total === 0) {
-    progress.clear();
-    console.log("No files found matching pattern.");
-    closeDb();
-    return;
-  }
-
-  let indexed = 0,
-    updated = 0,
-    unchanged = 0,
-    processed = 0;
-  const seenPaths = new Set<string>();
-  const startTime = Date.now();
-
-  for (const relativeFile of files) {
-    const filepath = getRealPath(resolve(resolvedPwd, relativeFile));
-    const path = handelize(relativeFile); // Normalize path for token-friendliness
-    seenPaths.add(path);
-
-    const content = await Bun.file(filepath).text();
-
-    // Skip empty files - nothing useful to index
-    if (!content.trim()) {
-      processed++;
-      continue;
-    }
-
-    const hash = await hashContent(content);
-    const title = extractTitle(content, relativeFile);
-
-    // Check if document exists in this collection with this path
-    const existing = findActiveDocument(db, collectionName, path);
-
-    if (existing) {
-      if (existing.hash === hash) {
-        // Hash unchanged, but check if title needs updating
-        if (existing.title !== title) {
-          updateDocumentTitle(db, existing.id, title, now);
-          updated++;
-        } else {
-          unchanged++;
-        }
-      } else {
-        // Content changed - insert new content hash and update document
-        insertContent(db, hash, content, now);
-        const stat = await Bun.file(filepath).stat();
-        updateDocument(
-          db,
-          existing.id,
-          title,
-          hash,
-          stat ? new Date(stat.mtime).toISOString() : now,
-        );
-        updated++;
-      }
-    } else {
-      // New document - insert content and document
-      indexed++;
-      insertContent(db, hash, content, now);
-      const stat = await Bun.file(filepath).stat();
-      insertDocument(
-        db,
-        collectionName,
-        path,
-        title,
-        hash,
-        stat ? new Date(stat.birthtime).toISOString() : now,
-        stat ? new Date(stat.mtime).toISOString() : now,
-      );
-    }
-
-    processed++;
-    progress.set((processed / total) * 100);
-    const elapsed = (Date.now() - startTime) / 1000;
-    const rate = processed / elapsed;
-    const remaining = (total - processed) / rate;
-    const eta = processed > 2 ? ` ETA: ${formatETA(remaining)}` : "";
-    process.stderr.write(`\rIndexing: ${processed}/${total}${eta}        `);
-  }
-
-  // Deactivate documents in this collection that no longer exist
-  const allActive = getActiveDocumentPaths(db, collectionName);
-  let removed = 0;
-  for (const path of allActive) {
-    if (!seenPaths.has(path)) {
-      deactivateDocument(db, collectionName, path);
-      removed++;
-    }
-  }
-
-  // Clean up orphaned content hashes (content not referenced by any document)
-  const orphanedContent = cleanupOrphanedContent(db);
-
-  // Check if vector index needs updating
-  const needsEmbedding = getHashesNeedingEmbedding(db);
-
-  progress.clear();
-  console.log(
-    `\nIndexed: ${indexed} new, ${updated} updated, ${unchanged} unchanged, ${removed} removed`,
-  );
-  if (orphanedContent > 0) {
-    console.log(`Cleaned up ${orphanedContent} orphaned content hash(es)`);
-  }
-
-  if (needsEmbedding > 0 && !suppressEmbedNotice) {
-    console.log(
-      `\nRun 'qmd embed' to update embeddings (${needsEmbedding} unique hashes need vectors)`,
-    );
-  }
-
-  closeDb();
-}
-
-function renderProgressBar(percent: number, width: number = 30): string {
-  const filled = Math.round((percent / 100) * width);
-  const empty = width - filled;
-  const bar = "█".repeat(filled) + "░".repeat(empty);
-  return bar;
 }
 
 async function vectorIndex(

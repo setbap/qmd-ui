@@ -483,54 +483,52 @@ export function CollectionPanel({
                                 No files indexed
                               </div>
                             ) : (
-                              <ScrollArea className="max-h-48">
-                                <div className="space-y-0.5">
-                                  {files.map((file, idx) => {
-                                    const fileFullPath = `qmd://${collection.name}/${file.path}`
-                                    const isActive =
-                                      selectedFilePath === fileFullPath
-                                    return (
-                                      <SidebarMenuSubItem
-                                        key={`${file.path}-${idx}`}
+                              <ScrollArea className={'pb-2'}>
+                                {files.map((file, idx) => {
+                                  const fileFullPath = `qmd://${collection.name}/${file.path}`
+                                  const isActive =
+                                    selectedFilePath === fileFullPath
+                                  return (
+                                    <SidebarMenuSubItem
+                                      key={`${file.path}-${idx}`}
+                                    >
+                                      <SidebarMenuSubButton
+                                        className={cn(
+                                          'cursor-pointer',
+                                          isActive
+                                            ? 'bg-amber-500 text-black'
+                                            : 'hover:bg-amber-600',
+                                        )}
+                                        title={file.path}
+                                        onClick={() =>
+                                          onFileClick?.(
+                                            file.path,
+                                            collection.name,
+                                          )
+                                        }
                                       >
-                                        <SidebarMenuSubButton
+                                        <RiFileTextLine
                                           className={cn(
-                                            'cursor-pointer',
-                                            isActive
-                                              ? 'bg-amber-500 text-black'
-                                              : 'hover:bg-amber-600',
+                                            'text-neutral-700!',
+                                            'h-3 w-3 shrink-0',
+                                            isActive && 'text-white!',
                                           )}
-                                          title={file.path}
-                                          onClick={() =>
-                                            onFileClick?.(
-                                              file.path,
-                                              collection.name,
-                                            )
-                                          }
+                                        />
+                                        <span
+                                          className={cn(
+                                            'truncate text-xs',
+                                            isActive &&
+                                              'text-amber-50 font-medium',
+                                          )}
                                         >
-                                          <RiFileTextLine
-                                            className={cn(
-                                              'text-neutral-700!',
-                                              'h-3 w-3 shrink-0',
-                                              isActive && 'text-white!',
-                                            )}
-                                          />
-                                          <span
-                                            className={cn(
-                                              'truncate text-xs',
-                                              isActive &&
-                                                'text-amber-50 font-medium',
-                                            )}
-                                          >
-                                            {file.title ||
-                                              file.path.split('/').pop() ||
-                                              file.path}
-                                          </span>
-                                        </SidebarMenuSubButton>
-                                      </SidebarMenuSubItem>
-                                    )
-                                  })}
-                                </div>
+                                          {file.title ||
+                                            file.path.split('/').pop() ||
+                                            file.path}
+                                        </span>
+                                      </SidebarMenuSubButton>
+                                    </SidebarMenuSubItem>
+                                  )
+                                })}
                               </ScrollArea>
                             )}
                           </SidebarMenuSub>

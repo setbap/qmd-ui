@@ -28,7 +28,9 @@ export function Layout({
           </div>
         </header>
         <div className="flex h-[calc(100vh-4rem)] flex-col gap-4">
-          <div className="flex overflow-hidden">{children}</div>
+          <div className="flex h-full overflow-hidden overscroll-none">
+            {children}
+          </div>
         </div>
       </SidebarInset>
       {sideBar}

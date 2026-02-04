@@ -19,8 +19,10 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.1",
+    "eslint": "^9.39.2",
     "nitro": "^3.0.1-alpha.2",
     "node-llama-cpp": "^3.14.5",
+    "prettier": "^3.8.1",
     "sqlite-vec": "^0.1.7-alpha.2",
     "yaml": "^2.8.2",
     "zod": "^4.2.1"
