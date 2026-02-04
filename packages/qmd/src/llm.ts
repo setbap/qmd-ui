@@ -16,7 +16,15 @@ import {
 } from "node-llama-cpp";
 import { homedir } from "os";
 import { join } from "path";
-import { existsSync, mkdirSync } from "fs";
+import {
+  existsSync,
+  mkdirSync,
+  statSync,
+  unlinkSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from "fs";
 
 // =============================================================================
 // Embedding Formatting Functions
@@ -120,6 +128,49 @@ export type RerankOptions = {
 };
 
 /**
+ * Options for LLM sessions
+ */
+export type LLMSessionOptions = {
+  /** Max session duration in ms (default: 10 minutes) */
+  maxDuration?: number;
+  /** External abort signal */
+  signal?: AbortSignal;
+  /** Debug name for logging */
+  name?: string;
+};
+
+/**
+ * Session interface for scoped LLM access with lifecycle guarantees
+ */
+export interface ILLMSession {
+  embed(text: string, options?: EmbedOptions): Promise<EmbeddingResult | null>;
+  embedBatch(texts: string[]): Promise<(EmbeddingResult | null)[]>;
+  expandQuery(
+    query: string,
+    options?: { context?: string; includeLexical?: boolean },
+  ): Promise<Queryable[]>;
+  rerank(
+    query: string,
+    documents: RerankDocument[],
+    options?: RerankOptions,
+  ): Promise<RerankResult>;
+  /** Whether this session is still valid (not released or aborted) */
+  readonly isValid: boolean;
+  /** Abort signal for this session (aborts on release or maxDuration) */
+  readonly signal: AbortSignal;
+}
+
+/**
+ * Error thrown when accessing a released session
+ */
+export class SessionReleasedError extends Error {
+  constructor(message: string = "Session has been released") {
+    super(message);
+    this.name = "SessionReleasedError";
+  }
+}
+
+/**
  * Supported query types for different search backends
  */
 export type QueryType = "lex" | "vec" | "hyde";
@@ -157,6 +208,113 @@ const DEFAULT_GENERATE_MODEL =
 
 // Local model cache directory
 const MODEL_CACHE_DIR = join(homedir(), ".cache", "qmd", "models");
+export const DEFAULT_MODEL_CACHE_DIR = MODEL_CACHE_DIR;
+
+// Export model URIs for external use
+export const DEFAULT_EMBED_MODEL_URI = DEFAULT_EMBED_MODEL;
+export const DEFAULT_RERANK_MODEL_URI = DEFAULT_RERANK_MODEL;
+export const DEFAULT_GENERATE_MODEL_URI = DEFAULT_GENERATE_MODEL;
+
+/**
+ * Result of a model pull operation
+ */
+export type PullResult = {
+  model: string;
+  path: string;
+  sizeBytes: number;
+  refreshed: boolean;
+};
+
+type HfRef = {
+  repo: string;
+  file: string;
+};
+
+function parseHfUri(model: string): HfRef | null {
+  if (!model.startsWith("hf:")) return null;
+  const without = model.slice(3);
+  const parts = without.split("/");
+  if (parts.length < 3) return null;
+  const repo = parts.slice(0, 2).join("/");
+  const file = parts.slice(2).join("/");
+  return { repo, file };
+}
+
+async function getRemoteEtag(ref: HfRef): Promise<string | null> {
+  const url = `https://huggingface.co/${ref.repo}/resolve/main/${ref.file}`;
+  try {
+    const resp = await fetch(url, { method: "HEAD" });
+    if (!resp.ok) return null;
+    const etag = resp.headers.get("etag");
+    return etag || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Pull/download models from HuggingFace with ETag-based caching
+ */
+export async function pullModels(
+  models: string[],
+  options: { refresh?: boolean; cacheDir?: string } = {},
+): Promise<PullResult[]> {
+  const cacheDir = options.cacheDir || MODEL_CACHE_DIR;
+  if (!existsSync(cacheDir)) {
+    mkdirSync(cacheDir, { recursive: true });
+  }
+
+  const results: PullResult[] = [];
+  for (const model of models) {
+    let refreshed = false;
+    const hfRef = parseHfUri(model);
+    const filename = model.split("/").pop();
+    const entries = readdirSync(cacheDir, { withFileTypes: true });
+    const cached = filename
+      ? entries
+          .filter((entry) => entry.isFile() && entry.name.includes(filename))
+          .map((entry) => join(cacheDir, entry.name))
+      : [];
+
+    if (hfRef && filename) {
+      const etagPath = join(cacheDir, `${filename}.etag`);
+      const remoteEtag = await getRemoteEtag(hfRef);
+      const localEtag = existsSync(etagPath)
+        ? readFileSync(etagPath, "utf-8").trim()
+        : null;
+      const shouldRefresh =
+        options.refresh ||
+        !remoteEtag ||
+        remoteEtag !== localEtag ||
+        cached.length === 0;
+
+      if (shouldRefresh) {
+        for (const candidate of cached) {
+          if (existsSync(candidate)) unlinkSync(candidate);
+        }
+        if (existsSync(etagPath)) unlinkSync(etagPath);
+        refreshed = cached.length > 0;
+      }
+    } else if (options.refresh && filename) {
+      for (const candidate of cached) {
+        if (existsSync(candidate)) unlinkSync(candidate);
+        refreshed = true;
+      }
+    }
+
+    const path = await resolveModelFile(model, cacheDir);
+    const sizeBytes = existsSync(path) ? statSync(path).size : 0;
+    if (hfRef && filename) {
+      const remoteEtag = await getRemoteEtag(hfRef);
+      if (remoteEtag) {
+        const etagPath = join(cacheDir, `${filename}.etag`);
+        writeFileSync(etagPath, remoteEtag + "\n", "utf-8");
+      }
+    }
+    results.push({ model, path, sizeBytes, refreshed });
+  }
+  return results;
+}
 
 // =============================================================================
 // LLM Interface
@@ -219,7 +377,7 @@ export type LlamaCppConfig = {
   rerankModel?: string;
   modelCacheDir?: string;
   /**
-   * Inactivity timeout in ms before unloading contexts (default: 2 minutes, 0 to disable).
+   * Inactivity timeout in ms before unloading contexts (default: 5 minutes, 0 to disable).
    *
    * Per node-llama-cpp lifecycle guidance, we prefer keeping models loaded and only disposing
    * contexts when idle, since contexts (and their sequences) are the heavy per-session objects.
@@ -238,8 +396,8 @@ export type LlamaCppConfig = {
 /**
  * LLM implementation using node-llama-cpp
  */
-// Default inactivity timeout: 2 minutes
-const DEFAULT_INACTIVITY_TIMEOUT_MS = 2 * 60 * 1000;
+// Default inactivity timeout: 5 minutes (keep models warm during typical search sessions)
+const DEFAULT_INACTIVITY_TIMEOUT_MS = 5 * 60 * 1000;
 
 export class LlamaCpp implements LLM {
   private llama: Llama | null = null;
@@ -283,7 +441,7 @@ export class LlamaCpp implements LLM {
 
   /**
    * Reset the inactivity timer. Called after each model operation.
-   * When timer fires, models are unloaded to free memory.
+   * When timer fires, models are unloaded to free memory (if no active sessions).
    */
   private touchActivity(): void {
     // Clear existing timer
@@ -295,6 +453,14 @@ export class LlamaCpp implements LLM {
     // Only set timer if we have disposable contexts and timeout is enabled
     if (this.inactivityTimeoutMs > 0 && this.hasLoadedContexts()) {
       this.inactivityTimer = setTimeout(() => {
+        // Check if session manager allows unloading
+        // canUnloadLLM is defined later in this file - it checks the session manager
+        // We use dynamic import pattern to avoid circular dependency issues
+        if (typeof canUnloadLLM === "function" && !canUnloadLLM()) {
+          // Active sessions/operations - reschedule timer
+          this.touchActivity();
+          return;
+        }
         this.unloadIdleResources().catch((err) => {
           console.error("Error unloading idle resources:", err);
         });
@@ -406,6 +572,8 @@ export class LlamaCpp implements LLM {
       const modelPath = await this.resolveModel(this.embedModelUri);
       const model = await llama.loadModel({ modelPath });
       this.embedModel = model;
+      // Model loading counts as activity - ping to keep alive
+      this.touchActivity();
       return model;
     })();
 
@@ -835,6 +1003,173 @@ Final Output:`;
     this.embedContextCreatePromise = null;
     this.generateModelLoadPromise = null;
     this.rerankModelLoadPromise = null;
+  }
+}
+
+// =============================================================================
+// Session Management
+// =============================================================================
+
+/**
+ * Session manager for tracking active LLM sessions
+ * Prevents idle resource unloading while operations are in progress
+ */
+class SessionManager {
+  private activeSessions = 0;
+  private abortControllers = new Set<AbortController>();
+
+  /**
+   * Increment active session count
+   */
+  enter(): void {
+    this.activeSessions++;
+  }
+
+  /**
+   * Decrement active session count
+   */
+  exit(): void {
+    this.activeSessions--;
+    if (this.activeSessions < 0) {
+      this.activeSessions = 0;
+    }
+  }
+
+  /**
+   * Check if any sessions are currently active
+   */
+  hasActiveSessions(): boolean {
+    return this.activeSessions > 0;
+  }
+
+  /**
+   * Register an abort controller for cleanup
+   */
+  registerAbortController(controller: AbortController): void {
+    this.abortControllers.add(controller);
+  }
+
+  /**
+   * Unregister an abort controller
+   */
+  unregisterAbortController(controller: AbortController): void {
+    this.abortControllers.delete(controller);
+  }
+
+  /**
+   * Abort all registered controllers
+   */
+  abortAll(): void {
+    for (const controller of this.abortControllers) {
+      controller.abort();
+    }
+    this.abortControllers.clear();
+  }
+}
+
+const sessionManager = new SessionManager();
+
+/**
+ * Check if LLM resources can be safely unloaded
+ * Returns false if there are active sessions
+ */
+export function canUnloadLLM(): boolean {
+  return !sessionManager.hasActiveSessions();
+}
+
+/**
+ * Wrap LLM operations in a managed session with lifecycle guarantees.
+ * Prevents idle resource unloading during operations and provides abort capability.
+ *
+ * @example
+ * const result = await withLLMSession(async (session) => {
+ *   const embedding = await session.embed("text");
+ *   return embedding;
+ * });
+ */
+export async function withLLMSession<T>(
+  callback: (session: ILLMSession) => Promise<T>,
+  options: LLMSessionOptions = {},
+): Promise<T> {
+  const llm = getDefaultLlamaCpp();
+  const maxDuration = options.maxDuration ?? 10 * 60 * 1000; // 10 minutes default
+  const name = options.name ?? "unnamed";
+
+  // Create abort controller for this session
+  const abortController = new AbortController();
+
+  // Link to external signal if provided
+  if (options.signal) {
+    options.signal.addEventListener("abort", () => {
+      abortController.abort();
+    });
+  }
+
+  // Set up max duration timeout
+  const timeoutId =
+    maxDuration > 0
+      ? setTimeout(() => {
+          abortController.abort();
+        }, maxDuration)
+      : null;
+
+  // Register with session manager
+  sessionManager.enter();
+  sessionManager.registerAbortController(abortController);
+
+  // Create session wrapper
+  let released = false;
+  const session: ILLMSession = {
+    get isValid() {
+      return !released && !abortController.signal.aborted;
+    },
+    get signal() {
+      return abortController.signal;
+    },
+    async embed(text: string, options?: EmbedOptions): Promise<EmbeddingResult | null> {
+      if (!this.isValid) {
+        throw new SessionReleasedError();
+      }
+      return llm.embed(text, options);
+    },
+    async embedBatch(texts: string[]): Promise<(EmbeddingResult | null)[]> {
+      if (!this.isValid) {
+        throw new SessionReleasedError();
+      }
+      return llm.embedBatch(texts);
+    },
+    async expandQuery(
+      query: string,
+      options?: { context?: string; includeLexical?: boolean },
+    ): Promise<Queryable[]> {
+      if (!this.isValid) {
+        throw new SessionReleasedError();
+      }
+      return llm.expandQuery(query, options);
+    },
+    async rerank(
+      query: string,
+      documents: RerankDocument[],
+      options?: RerankOptions,
+    ): Promise<RerankResult> {
+      if (!this.isValid) {
+        throw new SessionReleasedError();
+      }
+      return llm.rerank(query, documents, options);
+    },
+  };
+
+  try {
+    const result = await callback(session);
+    return result;
+  } finally {
+    // Cleanup
+    released = true;
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    sessionManager.unregisterAbortController(abortController);
+    sessionManager.exit();
   }
 }
 
