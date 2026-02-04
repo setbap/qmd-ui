@@ -56,6 +56,7 @@ function HomeComponent() {
     closeCreateDialog,
     openSettings,
     closeSettings,
+    openSearchHistory,
   } = useUIStore()
 
   const {
@@ -169,6 +170,16 @@ function HomeComponent() {
         e.preventDefault()
         openCommandPalette()
       }
+      // Cmd/Ctrl+.: Open Settings
+      if ((e.ctrlKey || e.metaKey) && e.key === '.') {
+        e.preventDefault()
+        openSettings()
+      }
+      // Cmd/Ctrl+H: Open History
+      if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+        e.preventDefault()
+        openSearchHistory()
+      }
       // / key: Focus search input (when not in an input field)
       if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         const target = e.target as HTMLElement
@@ -185,7 +196,7 @@ function HomeComponent() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [openCommandPalette])
+  }, [openCommandPalette, openSettings, openSearchHistory])
 
   // Command palette actions
   const handleCommandAction = useCallback(

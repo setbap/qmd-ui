@@ -577,3 +577,20 @@ export const clearIndexCache = createServerFn().handler(async () => {
   clearCache(store.db)
   return { success: true }
 })
+
+export interface AppInfo {
+  name: string
+  version: string
+  description: string
+}
+
+export const getAppInfo = createServerFn({ method: 'GET' }).handler(
+  async (): Promise<AppInfo> => {
+    return {
+      name: Bun.env.name || 'QMD Web',
+      version: Bun.env.version || '1.0.0',
+      description:
+        'Query Markup Documents - Search and explore your document collections',
+    }
+  },
+)

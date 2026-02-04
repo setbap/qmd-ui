@@ -1,12 +1,16 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import {
   RiFolderLine,
   RiFileTextLine,
   RiArrowRightSLine,
   RiDatabase2Line,
   RiAddLine,
+  RiSunLine,
+  RiMoonLine,
+  RiComputerLine,
+  RiQuestionLine,
 } from '@remixicon/react'
 import { cn } from '@/lib/utils'
 import {
@@ -35,6 +39,8 @@ import { toast } from 'sonner'
 import { useCollectionsStore, useFileViewerStore } from '@/stores'
 import { CollectionDialogs } from './CollectionDialogs'
 import { CollectionMenu } from './CollectionMenu'
+import { useTheme } from '@/components/ThemeProvider'
+import { AppInfoModal } from '@/components/AppInfoModal'
 
 // Collection type matching what the server returns (from YAML config)
 interface Collection {
@@ -86,6 +92,8 @@ export function CollectionPanel({
     clearFileCache,
   } = useCollectionsStore()
   const { selectedFile } = useFileViewerStore()
+  const { theme, setTheme } = useTheme()
+  const [isAppInfoOpen, setIsAppInfoOpen] = useState(false)
 
   const selectedFilePath = selectedFile
     ? `qmd://${selectedFile.collectionName}/${selectedFile.path}`
@@ -360,7 +368,43 @@ export function CollectionPanel({
         </SidebarContent>
 
         <SidebarFooter className="p-4">
-          <div className="text-xs">made by sina and ai</div>
+          <div className="flex items-center justify-between">
+            {/* Theme Toggle Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 hover:bg-amber-900/30"
+              onClick={() => {
+                const themes: Array<'light' | 'dark' | 'system'> = [
+                  'light',
+                  'dark',
+                  'system',
+                ]
+                const currentIndex = Math.max(
+                  0,
+                  themes.indexOf(theme as 'light' | 'dark' | 'system'),
+                )
+                const nextTheme = themes[(currentIndex + 1) % themes.length]
+                setTheme(nextTheme!)
+              }}
+              title={`Theme: ${theme} (click to change)`}
+            >
+              {theme === 'light' && <RiSunLine className="h-4 w-4" />}
+              {theme === 'dark' && <RiMoonLine className="h-4 w-4" />}
+              {theme === 'system' && <RiComputerLine className="h-4 w-4" />}
+            </Button>
+
+            {/* Help Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 hover:bg-amber-900/30"
+              onClick={() => setIsAppInfoOpen(true)}
+              title="About & Shortcuts"
+            >
+              <RiQuestionLine className="h-4 w-4" />
+            </Button>
+          </div>
         </SidebarFooter>
       </Sidebar>
 
@@ -371,6 +415,8 @@ export function CollectionPanel({
         onDeleteCollection={onDeleteCollection}
         onRenameCollection={onRenameCollection}
       />
+
+      <AppInfoModal open={isAppInfoOpen} onOpenChange={setIsAppInfoOpen} />
     </>
   )
 }

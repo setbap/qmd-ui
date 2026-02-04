@@ -19,6 +19,12 @@ import {
 } from '@/components/ui/command'
 import { useSearchStore, useUIStore, type SearchHistoryItem } from '@/stores'
 import { Button } from '@/components/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { Kbd } from '@/components/ui/kbd'
 
 const modeIcons = {
   search: RiSearchLine,
@@ -45,15 +51,24 @@ export function SearchHistoryButton() {
   const { openSearchHistory } = useUIStore()
 
   return (
-    <Button
-      variant="ghost"
-      size="icon"
-      className="h-9 w-9"
-      onClick={openSearchHistory}
-      title="Search History (100 recent)"
-    >
-      <RiHistoryLine className="h-4 w-4" />
-    </Button>
+    <Tooltip>
+      <TooltipTrigger>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9"
+          onClick={openSearchHistory}
+        >
+          <RiHistoryLine className="h-4 w-4" />
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>
+        <div className="flex items-center gap-2">
+          <span>Search History</span>
+          <Kbd>⌘H</Kbd>
+        </div>
+      </TooltipContent>
+    </Tooltip>
   )
 }
 

@@ -83,19 +83,22 @@ export function FileContentPanel({
                 <div
                   key={index}
                   ref={isHighlighted ? highlightedRef : null}
-                  className={cn('flex', isHighlighted && 'bg-amber-500/20')}
+                  className={cn(
+                    'flex group',
+                    isHighlighted && 'bg-amber-500/20',
+                  )}
                 >
                   {/* Line number */}
                   <span
                     className={cn(
-                      'select-none pr-4 pl-2 text-right w-12 shrink-0 text-muted-foreground',
+                      'select-none group-hover:dark:bg-amber-900/20 group-hover:bg-amber-300/20 pr-4 pl-2 text-right w-12 shrink-0 text-muted-foreground',
                       isHighlighted && 'text-amber-500 font-bold',
                     )}
                   >
                     {currentLineNumber}
                   </span>
                   {/* Line content */}
-                  <span className="whitespace-pre-wrap break-all">
+                  <span className="whitespace-pre-wrap break-all group-hover:dark:bg-amber-900/20 group-hover:bg-amber-300/20 w-full">
                     {line || ' '}
                   </span>
                 </div>
