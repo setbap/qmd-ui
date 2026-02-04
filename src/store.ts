@@ -13,7 +13,7 @@
 
 import { Database } from "bun:sqlite";
 import { Glob } from "bun";
-import { realpathSync } from "node:fs";
+import { realpathSync, statSync } from "node:fs";
 import * as sqliteVec from "sqlite-vec";
 import {
   LlamaCpp,
@@ -21,6 +21,7 @@ import {
   formatQueryForEmbedding,
   formatDocForEmbedding,
   type RerankDocument,
+  type ILLMSession,
 } from "./llm";
 import {
   findContextForPath as collectionsFindContextForPath,
@@ -426,7 +427,7 @@ function setSQLiteFromBrewPrefixEnv(): void {
 
   for (const candidate of candidates) {
     try {
-      if (Bun.file(candidate).size > 0) {
+      if (statSync(candidate).size > 0) {
         Database.setCustomSQLite(candidate);
         return;
       }
@@ -1876,9 +1877,10 @@ export function searchFTS(db: Database, query: string, limit: number = 20, colle
   const rows = db.prepare(sql).all(...params) as { filepath: string; display_path: string; title: string; body: string; hash: string; bm25_score: number }[];
   return rows.map(row => {
     const collectionName = row.filepath.split('//')[1]?.split('/')[0] || "";
-    // Convert bm25 (lower is better) into a stable (0..1] score where higher is better.
+    // Convert bm25 (negative, lower is better) into a stable (0..1] score where higher is better.
+    // BM25 scores in SQLite FTS5 are negative (e.g., -10 is strong, -2 is weak).
     // Avoid per-query normalization so "strong signal" heuristics can work.
-    const score = 1 / (1 + Math.max(0, row.bm25_score));
+    const score = 1 / (1 + Math.abs(row.bm25_score));
     return {
       filepath: row.filepath,
       displayPath: row.display_path,
@@ -1900,11 +1902,11 @@ export function searchFTS(db: Database, query: string, limit: number = 20, colle
 // Vector Search
 // =============================================================================
 
-export async function searchVec(db: Database, query: string, model: string, limit: number = 20, collectionName?: string): Promise<SearchResult[]> {
+export async function searchVec(db: Database, query: string, model: string, limit: number = 20, collectionName?: string, session?: ILLMSession): Promise<SearchResult[]> {
   const tableExists = db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name='vectors_vec'`).get();
   if (!tableExists) return [];
 
-  const embedding = await getEmbedding(query, model, true);
+  const embedding = await getEmbedding(query, model, true, session);
   if (!embedding) return [];
 
   // IMPORTANT: We use a two-step query approach here because sqlite-vec virtual tables
@@ -1990,11 +1992,12 @@ export async function searchVec(db: Database, query: string, model: string, limi
 // Embeddings
 // =============================================================================
 
-async function getEmbedding(text: string, model: string, isQuery: boolean): Promise<number[] | null> {
-  const llm = getDefaultLlamaCpp();
+async function getEmbedding(text: string, model: string, isQuery: boolean, session?: ILLMSession): Promise<number[] | null> {
   // Format text using the appropriate prompt template
   const formattedText = isQuery ? formatQueryForEmbedding(text) : formatDocForEmbedding(text);
-  const result = await llm.embed(formattedText, { model, isQuery });
+  const result = session
+    ? await session.embed(formattedText, { model, isQuery })
+    : await getDefaultLlamaCpp().embed(formattedText, { model, isQuery });
   return result?.embedding || null;
 }
 

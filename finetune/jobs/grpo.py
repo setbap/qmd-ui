@@ -28,6 +28,17 @@ from peft import LoraConfig, PeftModel, get_peft_model
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from trl import GRPOTrainer, GRPOConfig
 
+# Download eval_common.py if running as a standalone script (e.g. HF Jobs)
+_eval_common_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "eval_common.py")
+if not os.path.exists(_eval_common_path):
+    import urllib.request
+    _url = "https://huggingface.co/datasets/tobil/hf-cli-jobs-uv-run-scripts/resolve/main/eval_common.py"
+    _opener = urllib.request.build_opener()
+    _token = os.environ.get("HF_TOKEN", "")
+    if _token:
+        _opener.addheaders = [("Authorization", f"Bearer {_token}")]
+    with open(_eval_common_path, "wb") as _f:
+        _f.write(_opener.open(_url).read())
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from eval_common import QMDRewardFunction, run_eval
 
@@ -35,7 +46,7 @@ from eval_common import QMDRewardFunction, run_eval
 BASE_MODEL = "Qwen/Qwen3-1.7B"
 SFT_MODEL = "tobil/qmd-query-expansion-1.7B-sft"
 OUTPUT_MODEL = "tobil/qmd-query-expansion-1.7B-grpo"
-DATASET = "tobil/qmd-query-expansion-train-v2"
+DATASET = "tobil/qmd-query-expansion-train"
 
 
 def main():

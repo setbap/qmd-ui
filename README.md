@@ -1,4 +1,4 @@
-# QMD - Quick Markdown Search
+# QMD - Query Markup Documents
 
 An on-device search engine for everything you need to remember. Index your markdown notes, meeting transcripts, documentation, and knowledge bases. Search with keywords or natural language. Ideal for your agentic flows.
 
@@ -84,7 +84,14 @@ Although the tool works perfectly fine when you just tell your agent to use it o
 }
 ```
 
-**Claude Code configuration** (`~/.claude/settings.json`):
+**Claude Code** — Install the plugin (recommended):
+
+```bash
+claude marketplace add tobi/qmd
+claude plugin add qmd@qmd
+```
+
+Or configure MCP manually in `~/.claude/settings.json`:
 
 ```json
 {
@@ -220,7 +227,18 @@ Models are downloaded from HuggingFace and cached in `~/.cache/qmd/models/`.
 ## Installation
 
 ```sh
+bun install -g github:tobi/qmd
+```
+
+Make sure `~/.bun/bin` is in your PATH.
+
+### Development
+
+```sh
+git clone https://github.com/tobi/qmd
+cd qmd
 bun install
+bun link
 ```
 
 ## Usage

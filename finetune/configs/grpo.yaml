@@ -9,11 +9,17 @@
 
 model:
   base: "Qwen/Qwen3-1.7B"
-  sft: "tobil/qmd-query-expansion-1.7B-sft"
-  output: "tobil/qmd-query-expansion-1.7B-grpo"
+  sft: "outputs/sft"  # Use local SFT output (or HF path if uploaded)
+  output: "outputs/grpo"  # Local training output (push to HF manually after eval)
+  push_to_hub: false
+  torch_dtype: "bfloat16"
+  load_in_4bit: false
+  load_in_8bit: false
 
 dataset:
-  name: "tobil/qmd-query-expansion-train-v2"
+  # Local: run `uv run dataset/prepare_data.py` first, then use "data/train/"
+  # HuggingFace: use "tobil/qmd-query-expansion-train" (already prepared)
+  name: "data/train/"
   prompt_field: "messages"
   max_samples: 1000
 
@@ -21,7 +27,7 @@ training:
   epochs: 1
   batch_size: 2
   gradient_accumulation_steps: 8
-  learning_rate: 5e-7
+  learning_rate: 0.0000005
   max_grad_norm: 0.5
   max_steps: 200
 

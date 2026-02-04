@@ -1,3 +1,16 @@
+---
+license: mit
+language:
+  - en
+base_model: Qwen/Qwen3-1.7B
+tags:
+  - query-expansion
+  - search
+  - gguf
+  - qwen3
+pipeline_tag: text-generation
+---
+
 # QMD Query Expansion Fine-Tuning
 
 Train small language models to expand search queries for [QMD](https://github.com/tobi/qmd)'s hybrid retrieval pipeline.
@@ -7,11 +20,11 @@ Train small language models to expand search queries for [QMD](https://github.co
 Given a raw search query like `"auth config"`, the trained model produces structured expansions:
 
 ```
+hyde: Authentication can be configured by setting the AUTH_SECRET environment variable.
 lex: authentication configuration
 lex: auth settings setup
 vec: how to configure authentication settings
 vec: authentication configuration options
-hyde: Authentication can be configured by setting the AUTH_SECRET environment variable.
 ```
 
 These feed into QMD's three search backends:

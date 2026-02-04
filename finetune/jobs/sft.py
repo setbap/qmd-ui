@@ -25,7 +25,7 @@ from huggingface_hub import login
 # --- Config (inlined from configs/sft.yaml) ---
 BASE_MODEL = "Qwen/Qwen3-1.7B"
 OUTPUT_MODEL = "tobil/qmd-query-expansion-1.7B-sft"
-DATASET = "tobil/qmd-query-expansion-train-v2"
+DATASET = "tobil/qmd-query-expansion-train"
 
 hf_token = os.environ.get("HF_TOKEN")
 if hf_token:
@@ -100,6 +100,16 @@ trainer.push_to_hub()
 print(f"Done! Model: https://huggingface.co/{OUTPUT_MODEL}")
 
 # --- Automatic evaluation ---
+_eval_common_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "eval_common.py")
+if not os.path.exists(_eval_common_path):
+    import urllib.request
+    _url = "https://huggingface.co/datasets/tobil/hf-cli-jobs-uv-run-scripts/resolve/main/eval_common.py"
+    _opener = urllib.request.build_opener()
+    _token = os.environ.get("HF_TOKEN", "")
+    if _token:
+        _opener.addheaders = [("Authorization", f"Bearer {_token}")]
+    with open(_eval_common_path, "wb") as _f:
+        _f.write(_opener.open(_url).read())
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from eval_common import run_eval
 
