@@ -18,6 +18,7 @@ import {
   CommandSeparator,
 } from '@/components/ui/command'
 import { useSearchStore, useUIStore, type SearchHistoryItem } from '@/stores'
+import { useSettings } from '@/hooks/useSettings'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -81,6 +82,7 @@ export function SearchHistoryModal() {
     removeFromHistory,
     clearHistory,
   } = useSearchStore()
+  const { settings } = useSettings()
   const [searchTerm, setSearchTerm] = useState('')
 
   const filteredHistory = searchTerm
@@ -91,10 +93,18 @@ export function SearchHistoryModal() {
       )
     : history
 
+  const getMinScore = (mode: string) => {
+    return mode === 'vsearch'
+      ? settings.minScoreVsearch
+      : mode === 'search'
+        ? settings.minScoreSearch
+        : settings.minScoreQuery
+  }
+
   const handleSelect = async (item: SearchHistoryItem) => {
     loadHistoryItem(item)
     closeSearchHistory()
-    await executeSearch()
+    await executeSearch(settings.resultsPerPage, getMinScore(item.mode))
   }
 
   return (

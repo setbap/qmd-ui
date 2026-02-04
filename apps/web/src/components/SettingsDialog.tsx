@@ -14,26 +14,19 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import {
   RiSettings3Line,
   RiGlobalLine,
   RiListOrdered,
-  RiTerminalLine,
+  RiFilter3Line,
 } from '@remixicon/react'
 import { cn } from '@/lib/utils'
-
-type OutputFormat = 'cli' | 'json' | 'csv' | 'md' | 'xml' | 'files'
 
 export interface Settings {
   globalContext: string
   resultsPerPage: number
-  outputFormat: OutputFormat
+  minScoreSearch: number
+  minScoreVsearch: number
+  minScoreQuery: number
 }
 
 interface SettingsDialogProps {
@@ -42,19 +35,6 @@ interface SettingsDialogProps {
   settings: Settings
   onUpdate: (settings: Partial<Settings>) => void
 }
-
-const outputFormatOptions: {
-  value: OutputFormat
-  label: string
-  description: string
-}[] = [
-  { value: 'cli', label: 'CLI', description: 'Human-readable format' },
-  { value: 'json', label: 'JSON', description: 'Machine-readable JSON' },
-  { value: 'csv', label: 'CSV', description: 'Comma-separated values' },
-  { value: 'md', label: 'Markdown', description: 'Markdown table' },
-  { value: 'xml', label: 'XML', description: 'XML format' },
-  { value: 'files', label: 'Files', description: 'List of file paths only' },
-]
 
 export function SettingsDialog({
   open,
@@ -72,7 +52,9 @@ export function SettingsDialog({
     onUpdate({
       globalContext: localSettings.globalContext,
       resultsPerPage: localSettings.resultsPerPage,
-      outputFormat: localSettings.outputFormat,
+      minScoreSearch: localSettings.minScoreSearch,
+      minScoreVsearch: localSettings.minScoreVsearch,
+      minScoreQuery: localSettings.minScoreQuery,
     })
     onOpenChange(false)
   }
@@ -151,45 +133,81 @@ export function SettingsDialog({
             </p>
           </div>
 
-          {/* Output Format */}
-          <div className="space-y-2">
+          {/* Minimum Score Settings */}
+          <div className="space-y-3">
             <Label className="flex items-center gap-2 text-sm font-medium ">
-              <RiTerminalLine className="h-4 w-4 " />
-              Default Output Format
+              <RiFilter3Line className="h-4 w-4 " />
+              Minimum Score Threshold
             </Label>
-            <Select
-              value={localSettings.outputFormat}
-              onValueChange={(value) =>
-                setLocalSettings((prev) => ({
-                  ...prev,
-                  outputFormat: value as OutputFormat,
-                }))
-              }
-            >
-              <SelectTrigger
+            <p className="text-xs ">
+              Filter out results below this relevance score (0.0 - 1.0)
+            </p>
+
+            {/* Search Min Score */}
+            <div className="flex items-center gap-3">
+              <span className="text-xs w-20">Full-Text:</span>
+              <Input
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
+                value={localSettings.minScoreSearch}
+                onChange={(e) =>
+                  setLocalSettings((prev) => ({
+                    ...prev,
+                    minScoreSearch: parseFloat(e.target.value) || 0,
+                  }))
+                }
                 className={cn(
-                  'h-10 rounded-lg ',
-                  'focus:border-amber-500 focus:ring-amber-500/20',
+                  'h-8 w-24 rounded-lg text-sm',
+                  'focus-visible:border-amber-500 focus-visible:ring-amber-500/20',
                 )}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="rounded-lg">
-                {outputFormatOptions.map((option) => (
-                  <SelectItem
-                    key={option.value}
-                    value={option.value}
-                    className=" focus:bg-amber-900/30 focus:text-amber-50"
-                  >
-                    <div className="flex flex-col">
-                      <span className="font-medium">{option.label}</span>
-                      <span className="text-xs ">{option.description}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs ">Default format for search result output</p>
+              />
+            </div>
+
+            {/* Vector Search Min Score */}
+            <div className="flex items-center gap-3">
+              <span className="text-xs w-20">Vector:</span>
+              <Input
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
+                value={localSettings.minScoreVsearch}
+                onChange={(e) =>
+                  setLocalSettings((prev) => ({
+                    ...prev,
+                    minScoreVsearch: parseFloat(e.target.value) || 0.3,
+                  }))
+                }
+                className={cn(
+                  'h-8 w-24 rounded-lg text-sm',
+                  'focus-visible:border-amber-500 focus-visible:ring-amber-500/20',
+                )}
+              />
+            </div>
+
+            {/* Hybrid Query Min Score */}
+            <div className="flex items-center gap-3">
+              <span className="text-xs w-20">Hybrid:</span>
+              <Input
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
+                value={localSettings.minScoreQuery}
+                onChange={(e) =>
+                  setLocalSettings((prev) => ({
+                    ...prev,
+                    minScoreQuery: parseFloat(e.target.value) || 0,
+                  }))
+                }
+                className={cn(
+                  'h-8 w-24 rounded-lg text-sm',
+                  'focus-visible:border-amber-500 focus-visible:ring-amber-500/20',
+                )}
+              />
+            </div>
           </div>
         </div>
 

@@ -7,6 +7,7 @@ import { createSignal, createMemo } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
 import type { SettingsModalProps, FormatOption } from "../types/tui.js";
 import { OUTPUT_FORMATS, DEFAULT_THEME } from "../types/tui.js";
+import type { SelectOption } from "@opentui/core";
 
 const FORMAT_OPTIONS: FormatOption[] = [
   { name: "CLI", value: "cli", description: "Command line output" },
@@ -86,8 +87,9 @@ export function SettingsModal(props: SettingsModalProps) {
             <text width={18}>Output Format:</text>
             <select
               options={FORMAT_OPTIONS}
-              onSelect={(_idx: number, option: FormatOption) => {
-                props.onUpdate({ outputFormat: option.value });
+              onSelect={(_idx: number, option: SelectOption | null) => {
+                if (option === null) return;
+                props.onUpdate({ outputFormat: option?.value });
               }}
               selectedIndex={currentFormatIndex()}
               focused={focusIndex() === 0}

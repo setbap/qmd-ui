@@ -3,8 +3,9 @@
 import { useEffect, useRef } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
-import { RiFileTextLine, RiCloseLine } from '@remixicon/react'
+import { RiFileTextLine, RiCloseLine, RiClipboardLine } from '@remixicon/react'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 interface FileContentPanelProps {
   title: string
@@ -26,6 +27,15 @@ export function FileContentPanel({
 
   // Split content into lines for numbered display
   const lines = content.split('\n')
+
+  const handleCopyContent = async () => {
+    try {
+      await navigator.clipboard.writeText(content)
+      toast.success('File content copied to clipboard')
+    } catch {
+      toast.error('Failed to copy file content')
+    }
+  }
 
   // Scroll to highlighted line when it changes
   useEffect(() => {
@@ -60,15 +70,27 @@ export function FileContentPanel({
             </div>
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={onClose}
-          className="h-8 w-8 shrink-0"
-        >
-          <RiCloseLine className="h-5 w-5" />
-          <span className="sr-only">Close</span>
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={handleCopyContent}
+            className="h-8 w-8 shrink-0"
+            title="Copy file content"
+          >
+            <RiClipboardLine className="h-4 w-4" />
+            <span className="sr-only">Copy</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={onClose}
+            className="h-8 w-8 shrink-0"
+          >
+            <RiCloseLine className="h-5 w-5" />
+            <span className="sr-only">Close</span>
+          </Button>
+        </div>
       </div>
 
       {/* Content with line numbers */}

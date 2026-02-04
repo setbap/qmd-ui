@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useSearchStore, type SearchMode } from '@/stores'
+import { useSettings } from '@/hooks/useSettings'
 
 const searchModeOptions: {
   value: SearchMode
@@ -39,8 +40,9 @@ export function SearchBar({
   placeholder = 'Search your documents... ( Press / to focus and Enter to search )',
   disabled = false,
 }: SearchBarProps) {
-  const { query, setQuery, mode, setMode, collection, executeSearch } =
+  const { query, setQuery, mode, setMode, collection, executeSearch, results } =
     useSearchStore()
+  const { settings } = useSettings()
 
   const [localValue, setLocalValue] = React.useState(query)
 
@@ -49,16 +51,24 @@ export function SearchBar({
     setLocalValue(query)
   }, [query])
 
+  const getMinScore = (searchMode: SearchMode) => {
+    return searchMode === 'vsearch'
+      ? settings.minScoreVsearch
+      : searchMode === 'search'
+        ? settings.minScoreSearch
+        : settings.minScoreQuery
+  }
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       setQuery(localValue)
-      executeSearch()
+      executeSearch(settings.resultsPerPage, getMinScore(mode))
     }
   }
 
   const handleSubmit = () => {
     setQuery(localValue)
-    executeSearch()
+    executeSearch(settings.resultsPerPage, getMinScore(mode))
   }
 
   const handleModeChange = (newMode: SearchMode) => {
@@ -66,7 +76,7 @@ export function SearchBar({
     // If there's a query, re-execute search with new mode
     if (localValue.trim()) {
       setQuery(localValue)
-      executeSearch()
+      executeSearch(settings.resultsPerPage, getMinScore(newMode))
     }
   }
 
@@ -78,7 +88,8 @@ export function SearchBar({
         'absolute bottom-0 z-50',
         'left-1/2',
         '-translate-x-1/2',
-        'min-w-4xl',
+        'w-full',
+        'max-w-3xl',
       )}
     >
       <div className="px-4 py-4">
@@ -124,13 +135,25 @@ export function SearchBar({
                   </SelectContent>
                 </Select>
 
-                {/* Collection Indicator */}
                 <InputGroupText className="text-xs text-amber-700">
                   <RiDatabase2Line className="h-3 w-3" />
-                  <span className="truncate max-w-37.5">
+                  <span
+                    className="truncate max-w-32 overflow-hidden"
+                    title={collection || 'All Collections'}
+                  >
                     {collection || 'All Collections'}
                   </span>
                 </InputGroupText>
+                {query && (
+                  <>
+                    <InputGroupText className="text-xs truncate text-muted-foreground border-l pl-2">
+                      <span>{results.length} results</span>
+                    </InputGroupText>
+                    <InputGroupText className="text-xs truncate text-muted-foreground border-l pl-2">
+                      <span>min score: {getMinScore(mode)}</span>
+                    </InputGroupText>
+                  </>
+                )}
               </div>
             </div>
 

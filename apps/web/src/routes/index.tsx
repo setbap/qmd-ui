@@ -1,5 +1,5 @@
 import { createFileRoute, useSearch, useNavigate } from '@tanstack/react-router'
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { Layout } from '@/components/Layout'
 import { SearchBar } from '@/components/SearchBar'
 import { CollectionPanel } from '@/components/collection/CollectionPanel'
@@ -78,6 +78,9 @@ function HomeComponent() {
     isLoading: isSearchLoading,
   } = useSearchStore()
 
+  // Track if initial search from URL has been executed
+  const hasExecutedInitialSearch = useRef(false)
+
   // Sync URL params to store on mount
   useEffect(() => {
     const queryFromUrl = searchParams.q
@@ -87,13 +90,36 @@ function HomeComponent() {
     if (queryFromUrl) setQuery(queryFromUrl)
     if (modeFromUrl) setMode(modeFromUrl)
     if (collectionFromUrl) setCollection(collectionFromUrl)
-
-    // Execute search if query exists
-    if (queryFromUrl?.trim()) {
-      executeSearch()
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Execute search from URL params after settings are loaded
+  useEffect(() => {
+    // Only run if we have a query in URL, settings are loaded, and we haven't executed yet
+    if (
+      searchParams.q?.trim() &&
+      !settings.isLoading &&
+      !hasExecutedInitialSearch.current
+    ) {
+      hasExecutedInitialSearch.current = true
+      // Get minScore based on current mode
+      const minScore =
+        mode === 'vsearch'
+          ? settings.settings.minScoreVsearch
+          : mode === 'search'
+            ? settings.settings.minScoreSearch
+            : settings.settings.minScoreQuery
+      executeSearch(settings.settings.resultsPerPage, minScore)
+    }
+  }, [
+    searchParams.q,
+    settings.isLoading,
+    settings.settings.resultsPerPage,
+    mode,
+    settings.settings.minScoreSearch,
+    settings.settings.minScoreVsearch,
+    settings.settings.minScoreQuery,
+  ])
 
   // Load file from URL on mount
   useEffect(() => {
@@ -219,7 +245,13 @@ function HomeComponent() {
         case 'query':
           setMode(action)
           if (query.trim()) {
-            await executeSearch()
+            const minScore =
+              action === 'vsearch'
+                ? settings.settings.minScoreVsearch
+                : action === 'search'
+                  ? settings.settings.minScoreSearch
+                  : settings.settings.minScoreQuery
+            await executeSearch(settings.settings.resultsPerPage, minScore)
           }
           break
         case 'createCollection':
@@ -254,6 +286,10 @@ function HomeComponent() {
       executeSearch,
       openCreateDialog,
       openSettings,
+      settings.settings.resultsPerPage,
+      settings.settings.minScoreSearch,
+      settings.settings.minScoreVsearch,
+      settings.settings.minScoreQuery,
     ],
   )
 
@@ -263,10 +299,25 @@ function HomeComponent() {
       setCollection(name)
       // Re-run search if there's a query
       if (query.trim()) {
-        await executeSearch()
+        const minScore =
+          mode === 'vsearch'
+            ? settings.settings.minScoreVsearch
+            : mode === 'search'
+              ? settings.settings.minScoreSearch
+              : settings.settings.minScoreQuery
+        await executeSearch(settings.settings.resultsPerPage, minScore)
       }
     },
-    [setCollection, query, executeSearch],
+    [
+      setCollection,
+      query,
+      executeSearch,
+      settings.settings.resultsPerPage,
+      mode,
+      settings.settings.minScoreSearch,
+      settings.settings.minScoreVsearch,
+      settings.settings.minScoreQuery,
+    ],
   )
 
   // Handle result selection - uses file viewer store
@@ -297,8 +348,9 @@ function HomeComponent() {
   const dialogSettings: Settings = {
     globalContext: settings.settings.globalContext ?? '',
     resultsPerPage: settings.settings.resultsPerPage,
-    outputFormat:
-      (settings.settings.outputFormat as Settings['outputFormat']) ?? 'cli',
+    minScoreSearch: settings.settings.minScoreSearch ?? 0,
+    minScoreVsearch: settings.settings.minScoreVsearch ?? 0.3,
+    minScoreQuery: settings.settings.minScoreQuery ?? 0,
   }
 
   return (
@@ -307,7 +359,7 @@ function HomeComponent() {
         logo={
           <h1
             title="QMD Web"
-            className="select-none font-mono text-primary font-bold   bg-neutral-50 outline-1 px- p-1 rounded-md"
+            className="select-none w-full shadow-sm text-center font-mono text-primary font-bold border p-1 rounded-md"
           >
             QMD Web
           </h1>
@@ -324,6 +376,7 @@ function HomeComponent() {
               <span>Search For commands...</span>
               <Kbd>⌘K</Kbd>
             </Button>
+            <div className="w-6" />
           </div>
         }
         sideBar={
@@ -438,7 +491,9 @@ function HomeComponent() {
             await settings.updateSettings({
               globalContext: data.globalContext,
               resultsPerPage: data.resultsPerPage,
-              outputFormat: data.outputFormat as AppSettings['outputFormat'],
+              minScoreSearch: data.minScoreSearch,
+              minScoreVsearch: data.minScoreVsearch,
+              minScoreQuery: data.minScoreQuery,
             })
             toast.success('Settings updated')
           } catch {
@@ -452,11 +507,4 @@ function HomeComponent() {
       <Toaster theme="dark" position="bottom-right" />
     </>
   )
-}
-
-// Import AppSettings type for reference
-type AppSettings = {
-  globalContext?: string
-  outputFormat: 'text' | 'json' | 'markdown'
-  resultsPerPage: number
 }

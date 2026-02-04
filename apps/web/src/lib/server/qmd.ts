@@ -49,6 +49,7 @@ export interface SearchParams {
   mode: SearchMode
   collection?: string | null
   limit?: number
+  minScore?: number
 }
 
 export interface FileContent {
@@ -60,8 +61,10 @@ export interface FileContent {
 
 export interface AppSettings {
   globalContext?: string
-  outputFormat: 'text' | 'json' | 'markdown'
   resultsPerPage: number
+  minScoreSearch: number
+  minScoreVsearch: number
+  minScoreQuery: number
 }
 
 export interface CreateCollectionResult {
@@ -231,7 +234,7 @@ export const getJobStatus = createServerFn()
 
 export const search = createServerFn().handler(async (ctx) => {
   const data = ctx.data as unknown as SearchParams
-  const { query, mode, collection, limit = 20 } = data
+  const { query, mode, collection, limit = 20, minScore = 0 } = data
 
   if (!query.trim()) {
     return []
@@ -241,11 +244,11 @@ export const search = createServerFn().handler(async (ctx) => {
 
   switch (mode) {
     case 'search':
-      return executeFTS(store.db, query, limit, collection)
+      return executeFTS(store.db, query, limit, collection, minScore)
     case 'vsearch':
-      return executeVector(store.db, query, limit, collection)
+      return executeVector(store.db, query, limit, collection, minScore)
     case 'query':
-      return executeHybrid(store.db, query, limit, collection)
+      return executeHybrid(store.db, query, limit, collection, minScore)
     default:
       throw new Error(`Unknown search mode: ${mode}`)
   }
@@ -256,6 +259,7 @@ async function executeFTS(
   query: string,
   limit: number,
   collectionName?: string | null,
+  minScore: number = 0,
 ): Promise<SearchResult[]> {
   const fetchLimit = Math.max(50, limit * 2)
   const ftsResults = searchFTS(
@@ -265,10 +269,13 @@ async function executeFTS(
     (collectionName || '') as any,
   )
 
-  return ftsResults.slice(0, limit).map((r: SearchResult) => ({
-    ...r,
-    context: getContextForFile(db, r.filepath),
-  }))
+  return ftsResults
+    .filter((r: SearchResult) => r.score >= minScore)
+    .slice(0, limit)
+    .map((r: SearchResult) => ({
+      ...r,
+      context: getContextForFile(db, r.filepath),
+    }))
 }
 
 async function executeVector(
@@ -276,6 +283,7 @@ async function executeVector(
   query: string,
   limit: number,
   collectionName?: string | null,
+  minScore: number = 0,
 ): Promise<SearchResult[]> {
   // Check if vectors table exists
   const tableExists = db
@@ -298,10 +306,12 @@ async function executeVector(
     (collectionName || '') as any,
   )
 
-  return vecResults.map((r: SearchResult) => ({
-    ...r,
-    context: getContextForFile(db, r.filepath),
-  }))
+  return vecResults
+    .filter((r: SearchResult) => r.score >= minScore)
+    .map((r: SearchResult) => ({
+      ...r,
+      context: getContextForFile(db, r.filepath),
+    }))
 }
 
 async function executeHybrid(
@@ -309,6 +319,7 @@ async function executeHybrid(
   query: string,
   limit: number,
   collectionName?: string | null,
+  minScore: number = 0,
 ): Promise<SearchResult[]> {
   // Check if vectors table exists
   const hasVectors = !!db
@@ -328,10 +339,13 @@ async function executeHybrid(
 
   // If strong signal, return FTS results directly
   if (hasStrongSignal) {
-    return initialFts.slice(0, limit).map((r: SearchResult) => ({
-      ...r,
-      context: getContextForFile(db, r.filepath),
-    }))
+    return initialFts
+      .filter((r: SearchResult) => r.score >= minScore)
+      .slice(0, limit)
+      .map((r: SearchResult) => ({
+        ...r,
+        context: getContextForFile(db, r.filepath),
+      }))
   }
 
   // Otherwise, do hybrid search with RRF fusion
@@ -377,34 +391,37 @@ async function executeHybrid(
 
   const fused = reciprocalRankFusion(rankedLists)
 
-  return fused.slice(0, limit).map((fused: RankedResult) => {
-    const originalFts = initialFts.find(
-      (r: SearchResult) => r.filepath === fused.file,
-    )
+  return fused
+    .filter((fused: RankedResult) => fused.score >= minScore)
+    .slice(0, limit)
+    .map((fused: RankedResult) => {
+      const originalFts = initialFts.find(
+        (r: SearchResult) => r.filepath === fused.file,
+      )
 
-    if (originalFts) {
+      if (originalFts) {
+        return {
+          ...originalFts,
+          score: fused.score,
+          context: getContextForFile(db, fused.file),
+        }
+      }
+
       return {
-        ...originalFts,
+        filepath: fused.file,
+        displayPath: fused.displayPath,
+        title: fused.title,
+        body: fused.body,
         score: fused.score,
         context: getContextForFile(db, fused.file),
+        hash: '',
+        docid: '',
+        collectionName: '',
+        modifiedAt: '',
+        bodyLength: 0,
+        source: 'vec' as const,
       }
-    }
-
-    return {
-      filepath: fused.file,
-      displayPath: fused.displayPath,
-      title: fused.title,
-      body: fused.body,
-      score: fused.score,
-      context: getContextForFile(db, fused.file),
-      hash: '',
-      docid: '',
-      collectionName: '',
-      modifiedAt: '',
-      bodyLength: 0,
-      source: 'vec' as const,
-    }
-  })
+    })
 }
 
 // =============================================================================
@@ -543,8 +560,10 @@ export const getSettings = createServerFn().handler(async () => {
   // Merge with web-specific settings
   const defaultSettings: AppSettings = {
     globalContext: config.global_context,
-    outputFormat: 'text',
-    resultsPerPage: 20,
+    resultsPerPage: config.results_per_page ?? 20,
+    minScoreSearch: config.min_score_search ?? 0,
+    minScoreVsearch: config.min_score_vsearch ?? 0.3,
+    minScoreQuery: config.min_score_query ?? 0,
   }
 
   return defaultSettings
@@ -556,6 +575,22 @@ export const updateSettings = createServerFn().handler(async (ctx) => {
 
   if (data.globalContext !== undefined) {
     config.global_context = data.globalContext
+  }
+
+  if (data.resultsPerPage !== undefined) {
+    config.results_per_page = data.resultsPerPage
+  }
+
+  if (data.minScoreSearch !== undefined) {
+    config.min_score_search = data.minScoreSearch
+  }
+
+  if (data.minScoreVsearch !== undefined) {
+    config.min_score_vsearch = data.minScoreVsearch
+  }
+
+  if (data.minScoreQuery !== undefined) {
+    config.min_score_query = data.minScoreQuery
   }
 
   saveConfig(config)

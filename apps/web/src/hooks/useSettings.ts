@@ -31,8 +31,10 @@ export function useSettings() {
 
   return {
     settings: settingsQuery.data ?? {
-      outputFormat: 'text',
       resultsPerPage: 20,
+      minScoreSearch: 0,
+      minScoreVsearch: 0.3,
+      minScoreQuery: 0,
     },
     isLoading: settingsQuery.isLoading,
     error: settingsQuery.error,

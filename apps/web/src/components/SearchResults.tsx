@@ -2,9 +2,17 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { RiFileTextLine } from '@remixicon/react'
+import { RiFileTextLine, RiClipboardLine } from '@remixicon/react'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { toast } from 'sonner'
 
 export interface SearchResult {
   docid: string
@@ -22,6 +30,117 @@ interface SearchResultsProps {
   query: string
   isLoading?: boolean
   onSelectResult?: (result: SearchResult) => void
+}
+
+type CopyFormat = 'text' | 'json' | 'csv' | 'md' | 'xml' | 'files'
+
+interface FormatOption {
+  value: CopyFormat
+  label: string
+}
+
+const copyFormatOptions: FormatOption[] = [
+  { value: 'text', label: 'Copy as Text' },
+  { value: 'json', label: 'Copy as JSON' },
+  { value: 'csv', label: 'Copy as CSV' },
+  { value: 'md', label: 'Copy as Markdown' },
+  { value: 'xml', label: 'Copy as XML' },
+  { value: 'files', label: 'Copy as Files' },
+]
+
+function formatResultsAsText(results: SearchResult[]): string {
+  return results
+    .map(
+      (r, i) =>
+        `${i + 1}. ${r.title || r.displayPath.split('/').pop()}\n   DocID: #${r.docid}\n   Path: ${r.displayPath}\n   Score: ${(r.score * 100).toFixed(1)}%\n   Collection: ${r.collectionName}`,
+    )
+    .join('\n\n')
+}
+
+function formatResultsAsJson(results: SearchResult[]): string {
+  return JSON.stringify(results, null, 2)
+}
+
+function formatResultsAsCsv(results: SearchResult[]): string {
+  if (results.length === 0) return ''
+  const headers = ['docid', 'filepath', 'title', 'score', 'collectionName']
+  const rows = results.map((r) => [
+    r.docid,
+    r.filepath,
+    r.title || '',
+    r.score.toFixed(4),
+    r.collectionName,
+  ])
+  return [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
+}
+
+function formatResultsAsMarkdown(results: SearchResult[]): string {
+  if (results.length === 0) return ''
+  const headers = ['#', 'DocID', 'Title', 'Score', 'Path']
+  const separator = ['---', '---', '---', '---', '---']
+  const rows = results.map((r, i) => [
+    (i + 1).toString(),
+    r.docid,
+    r.title || r.displayPath.split('/').pop() || '',
+    `${(r.score * 100).toFixed(1)}%`,
+    r.displayPath,
+  ])
+  return [
+    headers.join(' | '),
+    separator.join(' | '),
+    ...rows.map((r) => r.join(' | ')),
+  ].join('\n')
+}
+
+function formatResultsAsXml(results: SearchResult[]): string {
+  if (results.length === 0) return '<results></results>'
+  const items = results
+    .map(
+      (r) => `  <result>
+    <docid>${r.docid}</docid>
+    <filepath>${r.filepath}</filepath>
+    <title>${r.title || ''}</title>
+    <score>${r.score.toFixed(4)}</score>
+    <collection>${r.collectionName}</collection>
+  </result>`,
+    )
+    .join('\n')
+  return `<results>\n${items}\n</results>`
+}
+
+function formatResultsAsFiles(results: SearchResult[]): string {
+  return results.map((r) => r.filepath).join('\n')
+}
+
+function getFormattedContent(
+  results: SearchResult[],
+  format: CopyFormat,
+): string {
+  switch (format) {
+    case 'text':
+      return formatResultsAsText(results)
+    case 'json':
+      return formatResultsAsJson(results)
+    case 'csv':
+      return formatResultsAsCsv(results)
+    case 'md':
+      return formatResultsAsMarkdown(results)
+    case 'xml':
+      return formatResultsAsXml(results)
+    case 'files':
+      return formatResultsAsFiles(results)
+    default:
+      return formatResultsAsText(results)
+  }
+}
+
+async function copyToClipboard(text: string, formatLabel: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+    toast.success(`Copied as ${formatLabel}`)
+  } catch {
+    toast.error('Failed to copy to clipboard')
+  }
 }
 
 export function SearchResults({
@@ -43,6 +162,15 @@ export function SearchResults({
     return body.slice(0, maxLength) + '...'
   }
 
+  const handleCopy = async (format: CopyFormat) => {
+    const formatted = getFormattedContent(results, format)
+    const option = copyFormatOptions.find((o) => o.value === format)
+    await copyToClipboard(
+      formatted,
+      option?.label.replace('Copy as ', '') || format,
+    )
+  }
+
   return (
     <div className={cn('flex h-full flex-col')}>
       {query && (
@@ -53,7 +181,34 @@ export function SearchResults({
               <span className="ml-2 text-xs ">for &quot;{query}&quot;</span>
             )}
           </h2>
-          <span className="text-xs ">{results.length} results</span>
+          <div className="flex items-center gap-2">
+            {results.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs gap-1"
+                  >
+                    <RiClipboardLine className="h-3.5 w-3.5" />
+                    Copy
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="rounded-lg">
+                  {copyFormatOptions.map((option) => (
+                    <DropdownMenuItem
+                      key={option.value}
+                      onClick={() => handleCopy(option.value)}
+                      className="text-xs cursor-pointer"
+                    >
+                      {option.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            <span className="text-xs ">{results.length} results</span>
+          </div>
         </div>
       )}
 

@@ -25,18 +25,22 @@ export type ContextMap = Record<string, string>;
  * A single collection configuration
  */
 export interface Collection {
-  path: string;           // Absolute path to index
-  pattern: string;        // Glob pattern (e.g., "**/*.md")
-  context?: ContextMap;   // Optional context definitions
-  update?: string;        // Optional bash command to run during qmd update
+  path: string; // Absolute path to index
+  pattern: string; // Glob pattern (e.g., "**/*.md")
+  context?: ContextMap; // Optional context definitions
+  update?: string; // Optional bash command to run during qmd update
 }
 
 /**
  * The complete configuration file structure
  */
 export interface CollectionConfig {
-  global_context?: string;                    // Context applied to all collections
-  collections: Record<string, Collection>;    // Collection name -> config
+  global_context?: string; // Context applied to all collections
+  results_per_page?: number; // Default number of results per page
+  min_score_search?: number; // Minimum score for search mode (default: 0)
+  min_score_vsearch?: number; // Minimum score for vsearch mode (default: 0.3)
+  min_score_query?: number; // Minimum score for query mode (default: 0)
+  collections: Record<string, Collection>; // Collection name -> config
 }
 
 /**
@@ -122,7 +126,7 @@ export function saveConfig(config: CollectionConfig): void {
   try {
     const yaml = YAML.stringify(config, {
       indent: 2,
-      lineWidth: 0,  // Don't wrap lines
+      lineWidth: 0, // Don't wrap lines
     });
     writeFileSync(configPath, yaml, "utf-8");
   } catch (error) {
@@ -162,7 +166,7 @@ export function listCollections(): NamedCollection[] {
 export function addCollection(
   name: string,
   path: string,
-  pattern: string = "**/*.md"
+  pattern: string = "**/*.md",
 ): void {
   const config = loadConfig();
 
@@ -245,7 +249,7 @@ export function getContexts(collectionName: string): ContextMap | undefined {
 export function addContext(
   collectionName: string,
   pathPrefix: string,
-  contextText: string
+  contextText: string,
 ): boolean {
   const config = loadConfig();
   const collection = config.collections[collectionName];
@@ -268,7 +272,7 @@ export function addContext(
  */
 export function removeContext(
   collectionName: string,
-  pathPrefix: string
+  pathPrefix: string,
 ): boolean {
   const config = loadConfig();
   const collection = config.collections[collectionName];
@@ -297,7 +301,8 @@ export function listAllContexts(): Array<{
   context: string;
 }> {
   const config = loadConfig();
-  const results: Array<{ collection: string; path: string; context: string }> = [];
+  const results: Array<{ collection: string; path: string; context: string }> =
+    [];
 
   // Add global context if present
   if (config.global_context) {
@@ -330,7 +335,7 @@ export function listAllContexts(): Array<{
  */
 export function findContextForPath(
   collectionName: string,
-  filePath: string
+  filePath: string,
 ): string | undefined {
   const config = loadConfig();
   const collection = config.collections[collectionName];
