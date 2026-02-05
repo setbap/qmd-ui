@@ -1,5 +1,4 @@
-'use client'
-
+import { ScriptOnce } from '@tanstack/react-router'
 import { createContext, useContext, useEffect, useState } from 'react'
 
 type Theme = 'dark' | 'light' | 'system'
@@ -10,7 +9,11 @@ interface ThemeContextType {
   resolvedTheme: 'dark' | 'light'
 }
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
+const ThemeContext = createContext<ThemeContextType>({
+  theme: 'system',
+  setTheme: () => {},
+  resolvedTheme: 'dark',
+})
 
 const STORAGE_KEY = 'qmd-theme'
 
@@ -21,45 +24,49 @@ function getSystemTheme(): 'dark' | 'light' {
     : 'light'
 }
 
-function getInitialTheme(): Theme {
-  if (typeof window === 'undefined') return 'system'
-  const stored = localStorage.getItem(STORAGE_KEY) as Theme | null
-  return stored || 'system'
-}
+const themeScript = `
+(function() {
+  try {
+    const theme = localStorage.getItem('${STORAGE_KEY}') || 'system'
+    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    const resolved = theme === 'system' ? systemTheme : theme
+    document.documentElement.classList.add(resolved)
+  } catch (e) {}
+})()
+`
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>('system')
   const [resolvedTheme, setResolvedTheme] = useState<'dark' | 'light'>('dark')
-  const [mounted, setMounted] = useState(false)
 
-  // Initialize theme on mount
   useEffect(() => {
-    const initialTheme = getInitialTheme()
-    setThemeState(initialTheme)
-    setResolvedTheme(
-      initialTheme === 'system' ? getSystemTheme() : initialTheme,
-    )
-    setMounted(true)
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY) as Theme | null
+      const initialTheme = stored || 'system'
+      const resolved =
+        initialTheme === 'system' ? getSystemTheme() : initialTheme
+      setThemeState(initialTheme)
+      setResolvedTheme(resolved)
+    } catch (e) {
+      console.warn('Failed to initialize theme:', e)
+    }
   }, [])
 
-  // Apply theme to document
   useEffect(() => {
-    if (!mounted) return
-
     const resolved = theme === 'system' ? getSystemTheme() : theme
     setResolvedTheme(resolved)
 
     const root = document.documentElement
-    if (resolved === 'dark') {
-      root.classList.add('dark')
-    } else {
-      root.classList.remove('dark')
+    root.classList.remove('light', 'dark')
+    root.classList.add(resolved)
+
+    try {
+      localStorage.setItem(STORAGE_KEY, theme)
+    } catch (e) {
+      console.log('localStorage not available')
     }
+  }, [theme])
 
-    localStorage.setItem(STORAGE_KEY, theme)
-  }, [theme, mounted])
-
-  // Listen for system theme changes
   useEffect(() => {
     if (theme !== 'system') return
 
@@ -68,11 +75,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const newResolved = mediaQuery.matches ? 'dark' : 'light'
       setResolvedTheme(newResolved)
       const root = document.documentElement
-      if (newResolved === 'dark') {
-        root.classList.add('dark')
-      } else {
-        root.classList.remove('dark')
-      }
+      root.classList.remove('light', 'dark')
+      root.classList.add(newResolved)
     }
 
     mediaQuery.addEventListener('change', handleChange)
@@ -83,22 +87,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setThemeState(newTheme)
   }
 
-  // Prevent flash by not rendering until mounted
-  if (!mounted) {
-    return <>{children}</>
-  }
-
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, resolvedTheme }}>
-      {children}
-    </ThemeContext.Provider>
+    <>
+      <ScriptOnce>{themeScript}</ScriptOnce>
+      <ThemeContext.Provider value={{ theme, setTheme, resolvedTheme }}>
+        {children}
+      </ThemeContext.Provider>
+    </>
   )
 }
 
 export function useTheme() {
-  const context = useContext(ThemeContext)
-  if (context === undefined) {
-    throw new Error('useTheme must be used within a ThemeProvider')
-  }
-  return context
+  return useContext(ThemeContext)
 }
