@@ -122,7 +122,7 @@ export function SearchHistoryModal() {
               const ModeIcon = modeIcons[item.mode]
               return (
                 <CommandItem
-                  key={item.id + item.timestamp}
+                  key={item.id + item.timestamp + item.mode}
                   onSelect={() => handleSelect(item)}
                   className="flex items-center group justify-between cursor-pointer"
                 >

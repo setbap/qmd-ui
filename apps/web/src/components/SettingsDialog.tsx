@@ -220,6 +220,7 @@ export function SettingsDialog({
           >
             Cancel
           </Button>
+          <div className="grow" />
           <Button type="button" onClick={handleSave} className="h-9 rounded-lg">
             Save Changes
           </Button>

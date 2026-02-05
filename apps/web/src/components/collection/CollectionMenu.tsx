@@ -6,6 +6,7 @@ import {
   RiEditLine,
   RiInformationLine,
   RiChatQuoteLine,
+  RiMore2Fill,
 } from '@remixicon/react'
 import {
   DropdownMenu,
@@ -46,6 +47,7 @@ export function CollectionMenu({ collection, onUpdate }: CollectionMenuProps) {
           size="icon"
           className="h-6 w-6 p-0 hover:bg-amber-900/30"
         >
+          <RiMore2Fill />
           <span className="sr-only">Actions for {collection.name}</span>
         </Button>
       </DropdownMenuTrigger>
