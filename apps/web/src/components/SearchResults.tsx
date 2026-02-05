@@ -174,8 +174,8 @@ export function SearchResults({
   return (
     <div className={cn('flex h-full flex-col')}>
       {query && (
-        <div className="flex items-center justify-between z-0 border-b h-12 px-2">
-          <h2 className="text-sm font-medium ">
+        <div className="flex items-center justify-between z-0 border-b h-12 px-5">
+          <h2 className="text-sm font-medium">
             Search Results
             {query && (
               <span className="ml-2 text-xs ">for &quot;{query}&quot;</span>

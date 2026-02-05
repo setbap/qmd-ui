@@ -24,7 +24,12 @@ import {
   ResizablePanel,
   ResizableHandle,
 } from '@/components/ui/resizable'
-import { useUIStore, useFileViewerStore, useSearchStore } from '@/stores'
+import {
+  useUIStore,
+  useFileViewerStore,
+  useSearchStore,
+  useCollectionsStore,
+} from '@/stores'
 
 export const Route = createFileRoute('/')({
   component: HomeComponent,
@@ -57,7 +62,9 @@ function HomeComponent() {
     openSettings,
     closeSettings,
     openSearchHistory,
+    openAddContextDialog,
   } = useUIStore()
+  const { clearFileCache } = useCollectionsStore()
 
   const {
     selectedFile,
@@ -231,6 +238,7 @@ function HomeComponent() {
         | 'createCollection'
         | 'updateCollection'
         | 'deleteCollection'
+        | 'addContext'
         | 'embed'
         | 'settings'
         | 'search'
@@ -258,10 +266,27 @@ function HomeComponent() {
           openCreateDialog()
           break
         case 'updateCollection':
-          toast.info('Select a collection to update')
+          if (collection) {
+            await collections.updateCollection(collection)
+            clearFileCache(collection)
+          } else {
+            toast.info('Select a collection to update')
+          }
           break
         case 'deleteCollection':
-          toast.info('Select a collection to delete')
+          if (collection) {
+            await collections.deleteCollection(collection)
+            clearFileCache(collection)
+          } else {
+            toast.info('Select a collection to delete')
+          }
+          break
+        case 'addContext':
+          if (collection) {
+            openAddContextDialog(collection)
+          } else {
+            toast.info('Select a collection to add context')
+          }
           break
         case 'settings':
           openSettings()
@@ -286,6 +311,10 @@ function HomeComponent() {
       executeSearch,
       openCreateDialog,
       openSettings,
+      openAddContextDialog,
+      collection,
+      collections.updateCollection,
+      collections.deleteCollection,
       settings.settings.resultsPerPage,
       settings.settings.minScoreSearch,
       settings.settings.minScoreVsearch,
@@ -451,6 +480,7 @@ function HomeComponent() {
         open={isCommandPaletteOpen}
         onOpenChange={closeCommandPalette}
         onAction={handleCommandAction}
+        selectedCollection={collection}
       />
 
       <CreateCollectionDialog

@@ -20,6 +20,7 @@ import {
   RiSearchLine,
   RiSparklingLine,
   RiDatabase2Line,
+  RiChatQuoteLine,
 } from '@remixicon/react'
 import { Kbd } from '@/components/ui/kbd'
 
@@ -27,6 +28,7 @@ type CommandAction =
   | 'createCollection'
   | 'updateCollection'
   | 'deleteCollection'
+  | 'addContext'
   | 'embed'
   | 'settings'
   | 'search'
@@ -39,100 +41,113 @@ interface CommandOption {
   action: CommandAction
   icon: React.ReactNode
   shortcut?: string
+  disabled?: boolean
 }
-
-const commandGroups: { heading: string; commands: CommandOption[] }[] = [
-  {
-    heading: 'Collections',
-    commands: [
-      {
-        id: 'create-collection',
-        label: 'Create Collection',
-        action: 'createCollection',
-        icon: <RiAddCircleLine className="size-4" />,
-        // shortcut: '⌘N',
-      },
-      {
-        id: 'update-collection',
-        label: 'Update Collection',
-        action: 'updateCollection',
-        icon: <RiRefreshLine className="size-4" />,
-      },
-      {
-        id: 'delete-collection',
-        label: 'Delete Collection',
-        action: 'deleteCollection',
-        icon: <RiDeleteBinLine className="size-4" />,
-      },
-    ],
-  },
-  {
-    heading: 'Search',
-    commands: [
-      {
-        id: 'search',
-        label: 'Text Search',
-        action: 'search',
-        icon: <RiSearchLine className="size-4" />,
-        // shortcut: '⌘1',
-      },
-      {
-        id: 'vsearch',
-        label: 'Vector Search',
-        action: 'vsearch',
-        icon: <RiSparklingLine className="size-4" />,
-        // shortcut: '⌘2',
-      },
-      {
-        id: 'query',
-        label: 'Hybrid Query',
-        action: 'query',
-        icon: <RiDatabase2Line className="size-4" />,
-        // shortcut: '⌘3',
-      },
-    ],
-  },
-  {
-    heading: 'Actions',
-    commands: [
-      {
-        id: 'embed',
-        label: 'Generate Embeddings',
-        action: 'embed',
-        icon: <RiSparklingLine className="size-4" />,
-        // shortcut: '⌘E',
-      },
-    ],
-  },
-  {
-    heading: 'Settings',
-    commands: [
-      {
-        id: 'settings',
-        label: 'Settings',
-        action: 'settings',
-        icon: <RiSettings3Line className="size-4" />,
-        // shortcut: '⌘,',
-      },
-    ],
-  },
-]
 
 interface CommandPaletteProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onAction: (action: CommandAction) => void
+  selectedCollection: string | null
 }
 
 export function CommandPalette({
   open,
   onOpenChange,
   onAction,
+  selectedCollection,
 }: CommandPaletteProps) {
   const handleSelect = (action: CommandAction) => {
     onAction(action)
     onOpenChange(false)
   }
+
+  // Build command groups dynamically based on selectedCollection
+  const commandGroups: { heading: string; commands: CommandOption[] }[] = [
+    {
+      heading: 'Collections',
+      commands: [
+        {
+          id: 'create-collection',
+          label: 'Create Collection',
+          action: 'createCollection',
+          icon: <RiAddCircleLine className="size-4" />,
+        },
+        {
+          id: 'update-collection',
+          label: selectedCollection
+            ? `Update Collection: ${selectedCollection}`
+            : 'Update Collection',
+          action: 'updateCollection',
+          icon: <RiRefreshLine className="size-4" />,
+          disabled: !selectedCollection,
+        },
+        {
+          id: 'delete-collection',
+          label: selectedCollection
+            ? `Delete Collection: ${selectedCollection}`
+            : 'Delete Collection',
+          action: 'deleteCollection',
+          icon: <RiDeleteBinLine className="size-4" />,
+          disabled: !selectedCollection,
+        },
+        {
+          id: 'add-context',
+          label: selectedCollection
+            ? `Add Context to: ${selectedCollection}`
+            : 'Add Context to Collection',
+          action: 'addContext',
+          icon: <RiChatQuoteLine className="size-4" />,
+          disabled: !selectedCollection,
+        },
+      ],
+    },
+    {
+      heading: 'Search',
+      commands: [
+        {
+          id: 'search',
+          label: 'Text Search',
+          action: 'search',
+          icon: <RiSearchLine className="size-4" />,
+        },
+        {
+          id: 'vsearch',
+          label: 'Vector Search',
+          action: 'vsearch',
+          icon: <RiSparklingLine className="size-4" />,
+        },
+        {
+          id: 'query',
+          label: 'Hybrid Query',
+          action: 'query',
+          icon: <RiDatabase2Line className="size-4" />,
+        },
+      ],
+    },
+    {
+      heading: 'Actions',
+      commands: [
+        {
+          id: 'embed',
+          label: 'Generate Embeddings',
+          action: 'embed',
+          icon: <RiSparklingLine className="size-4" />,
+        },
+      ],
+    },
+    {
+      heading: 'Settings',
+      commands: [
+        {
+          id: 'settings',
+          label: 'Settings',
+          action: 'settings',
+          icon: <RiSettings3Line className="size-4" />,
+        },
+      ],
+    },
+  ]
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
@@ -151,6 +166,12 @@ export function CommandPalette({
                   <CommandItem
                     key={command.id}
                     onSelect={() => handleSelect(command.action)}
+                    disabled={command.disabled}
+                    className={
+                      command.disabled
+                        ? 'opacity-50 cursor-not-allowed pointer-events-none'
+                        : ''
+                    }
                   >
                     {command.icon}
                     <span>{command.label}</span>

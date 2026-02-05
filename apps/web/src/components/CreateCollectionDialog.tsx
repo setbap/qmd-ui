@@ -279,7 +279,7 @@ export function CreateCollectionDialog({
           </div>
         )}
 
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter className="gap-2 sm:gap-0 ">
           {/* Show Cancel button only when not busy, or when complete/error */}
           {(!isBusy || isDone || hasError) && (
             <Button
@@ -292,6 +292,7 @@ export function CreateCollectionDialog({
             </Button>
           )}
 
+          <div className="grow" />
           {/* Show Create button only when not busy and not done */}
           {!isBusy && !isDone && !hasError && (
             <Button

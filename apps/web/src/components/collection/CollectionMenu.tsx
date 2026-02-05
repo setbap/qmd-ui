@@ -5,6 +5,7 @@ import {
   RiDeleteBinLine,
   RiEditLine,
   RiInformationLine,
+  RiChatQuoteLine,
 } from '@remixicon/react'
 import {
   DropdownMenu,
@@ -30,7 +31,12 @@ interface CollectionMenuProps {
 }
 
 export function CollectionMenu({ collection, onUpdate }: CollectionMenuProps) {
-  const { openRenameDialog, openDeleteDialog, openInfoDialog } = useUIStore()
+  const {
+    openRenameDialog,
+    openDeleteDialog,
+    openInfoDialog,
+    openAddContextDialog,
+  } = useUIStore()
 
   return (
     <DropdownMenu>
@@ -57,6 +63,11 @@ export function CollectionMenu({ collection, onUpdate }: CollectionMenuProps) {
         <DropdownMenuItem onClick={() => openInfoDialog(collection.name)}>
           <RiInformationLine className="mr-2 h-4 w-4" />
           Info
+        </DropdownMenuItem>
+
+        <DropdownMenuItem onClick={() => openAddContextDialog(collection.name)}>
+          <RiChatQuoteLine className="mr-2 h-4 w-4" />
+          Add Context
         </DropdownMenuItem>
 
         <DropdownMenuSeparator className="bg-amber-900/30" />

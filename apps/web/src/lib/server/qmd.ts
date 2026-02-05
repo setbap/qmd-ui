@@ -20,6 +20,7 @@ import {
   saveConfig,
   getStatus,
   clearCache,
+  addContext,
   type SearchResult,
   type RankedResult,
 } from '@qmd/core'
@@ -594,6 +595,26 @@ export const updateSettings = createServerFn().handler(async (ctx) => {
   }
 
   saveConfig(config)
+
+  return { success: true }
+})
+
+export const addCollectionContext = createServerFn().handler(async (ctx) => {
+  const data = ctx.data as unknown as {
+    collectionName: string
+    path: string
+    context: string
+  }
+  const { collectionName, path, context } = data
+
+  if (!collectionName || !context) {
+    throw new Error('Collection name and context are required')
+  }
+
+  // Use '/' as default path if not provided (applies to entire collection)
+  const contextPath = path || '/'
+
+  addContext(collectionName, contextPath, context)
 
   return { success: true }
 })

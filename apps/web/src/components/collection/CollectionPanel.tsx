@@ -130,7 +130,6 @@ export function CollectionPanel({
     async (collectionName: string) => {
       try {
         await onUpdateCollection(collectionName)
-        toast.success(`Collection "${collectionName}" updated successfully`)
         // Clear files from state
         clearFileCache(collectionName)
         // Reload files if expanded

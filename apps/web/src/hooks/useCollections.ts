@@ -3,6 +3,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import {
   getCollections,
@@ -156,7 +157,6 @@ export function useCollections() {
               queryKey: [COLLECTION_FILES_KEY, collectionName],
             })
 
-            // Auto-expand the collection when indexing completes
             if (job.status === 'completed') {
               setExpandedCollections((prev) => {
                 const next = new Set(prev)
@@ -212,7 +212,8 @@ export function useCollections() {
       const result = await deleteCollection({ data: { name } } as any)
       return result
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      toast.success(`Collection "${variables}" deleted successfully`)
       queryClient.invalidateQueries({ queryKey: [COLLECTIONS_KEY] })
     },
   })
@@ -223,7 +224,10 @@ export function useCollections() {
       const result = await renameCollectionFn({ data } as any)
       return result
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      toast.success(
+        `Collection "${variables.oldName}" renamed to "${variables.newName}" successfully`,
+      )
       queryClient.invalidateQueries({ queryKey: [COLLECTIONS_KEY] })
     },
   })
@@ -234,9 +238,14 @@ export function useCollections() {
       const result = await updateCollection({ data: { name } } as any)
       return result
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
+      toast.success(`Collection "${variables}" updated successfully`)
       queryClient.invalidateQueries({ queryKey: [COLLECTIONS_KEY] })
       queryClient.invalidateQueries({ queryKey: [COLLECTION_FILES_KEY] })
+    },
+    onError: (error, variables) => {
+      console.error('Failed to update collection:', error)
+      toast.error(`Failed to update collection "${variables}"`)
     },
   })
 

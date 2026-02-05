@@ -163,7 +163,6 @@ export function CollectionPanel({
     async (collectionName: string) => {
       try {
         await onUpdateCollection(collectionName)
-        toast.success(`Collection "${collectionName}" updated successfully`)
         // Refresh files after update
         setCollectionFiles((prev) => {
           const next = { ...prev }
